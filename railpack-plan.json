@@ -1,0 +1,31 @@
+{
+  "name": "fullstack-app",
+  "region": "europe-west4",
+  "services": [
+    {
+      "name": "frontend",
+      "type": "static",
+      "dir": "frontend/build",
+      "build": {
+        "commands": [
+          "cd frontend",
+          "npm ci",
+          "npm run build"
+        ]
+      }
+    },
+    {
+      "name": "backend",
+      "type": "node",
+      "dir": "backend",
+      "build": {
+        "commands": [
+          "cd backend",
+          "npm ci"
+        ]
+      },
+      "start": "node server.js",
+      "ports": [5000]
+    }
+  ]
+}
