@@ -5,14 +5,14 @@
     {
       "name": "frontend",
       "type": "static",
-      "dir": "frontend/build",
+      "dir": "frontend",
       "build": {
         "commands": [
-          "cd frontend",
           "npm ci",
           "npm run build"
         ]
-      }
+      },
+      "output": "build"
     },
     {
       "name": "backend",
@@ -20,7 +20,6 @@
       "dir": "backend",
       "build": {
         "commands": [
-          "cd backend",
           "npm ci"
         ]
       },
