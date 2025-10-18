@@ -3,84 +3,89 @@ const dotenv = require('dotenv');
 const passport = require('passport');
 const morgan = require('morgan');
 const cors = require('cors');
-const helmet = require('helmet'); // Importera Helmet för säkerhet
-const authRoutes = require('./routes/authRoutes'); // Auth-rutter
+const helmet = require('helmet');
+const authRoutes = require('./routes/authRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 const protectedRoutes = require('./routes/protectedRoutes');
 const fs = require('fs');
 const https = require('https');
-const cookieParser = require('cookie-parser');  // Importera cookie-parser
+const http = require('http');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 
-dotenv.config(); // Ladda miljövariabler
+// Ladda .env ENDAST i utveckling
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+  console.log('🌱 Miljövariabler laddade från .env');
+}
 
-// Konfigurera Passport
-require('./config/passport')(passport); // Passera Passport till konfigurationen
-
-const app = express(); // Skapa Express-applikationen
-
-// Använd Helmet för att säkerställa säkra HTTP-headers
-app.use(helmet());  // Säkerställer en rad grundläggande säkerhetsheaders
-
-// Logga varje inkommande förfrågan
-app.use((req, res, next) => {
-  console.log(`Inkommande förfrågan: ${req.method} ${req.url}`);
-  next();
+// Kontrollera obligatoriska miljövariabler
+const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET', 'PORT'];
+requiredVars.forEach((v) => {
+  if (!process.env[v]) {
+    console.error(`❌ Saknad miljövariabel: ${v}`);
+    process.exit(1);
+  }
 });
 
-// Använd cookie-parser innan Passport
-app.use(cookieParser());  // Lägg till cookie-parser här för att hantera cookies
+const app = express();
 
-// Använd Passport som middleware
-app.use(passport.initialize()); // Initialisera Passport
-
-// Middleware för loggning och hantering av CORS
-const corsOptions = {
-  origin: 'https://localhost:3000',  // Specificera den tillåtna origin
-  credentials: true,  // Tillåt cookies (credentials)
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'] // Specifika headers som tillåts
-};
-
-// För att servera favicon
-app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
-
-// Middleware för loggning och CORS
+// Middleware för säkerhet och loggning
+app.use(helmet());
 app.use(morgan('dev'));
-app.use(cors(corsOptions)); // Tillåt CORS med cookies
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Dynamisk origin
+  credentials: true,
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(cookieParser());
+
+// Passport
+require('./config/passport')(passport);
+app.use(passport.initialize());
 
 // Anpassad middleware
-applyMiddleware(app); // Din anpassade middleware
+applyMiddleware(app);
 
-// Auth-rutter
-app.use('/api/auth', authRoutes); // Lägg till auth-rutterna på /api/auth
+// Statisk filhantering
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// Skyddade rutter
-app.use('/api', protectedRoutes);  // Lägg till skyddade rutter
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api', protectedRoutes);
 
-// Ladda certifikat och nyckel för HTTPS
-const privateKey = fs.readFileSync('../localhost-key.pem', 'utf8'); 
-const certificate = fs.readFileSync('../localhost.pem', 'utf8'); 
-const credentials = { key: privateKey, cert: certificate };
+// HTTPS / HTTP fallback
+const PORT = process.env.PORT || 5000;
 
-// Felhantering för CORS-headers
+if (process.env.HTTPS === 'true') {
+  try {
+    const privateKey = fs.readFileSync(process.env.SSL_KEY_FILE, 'utf8');
+    const certificate = fs.readFileSync(process.env.SSL_CRT_FILE, 'utf8');
+    const credentials = { key: privateKey, cert: certificate };
+
+    https.createServer(credentials, app).listen(PORT, () => {
+      console.log(`🚀 HTTPS-servern körs på port ${PORT}`);
+    });
+  } catch (err) {
+    console.warn('⚠️ HTTPS-certifikat kunde inte läsas, fallback till HTTP');
+    http.createServer(app).listen(PORT, () => {
+      console.log(`🚀 HTTP-servern körs på port ${PORT}`);
+    });
+  }
+} else {
+  http.createServer(app).listen(PORT, () => {
+    console.log(`🚀 HTTP-servern körs på port ${PORT}`);
+  });
+}
+
+// Extra CORS-hantering för OPTIONS
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://localhost:3000"); // Viktigt att ange rätt origin
+  res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-
-  // Hantera OPTIONS-förfrågningar (för CORS preflight requests)
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
-});
-
-// Starta HTTPS-servern
-const PORT = process.env.PORT || 5000;
-https.createServer(credentials, app).listen(PORT, () => {
-  console.log(`🚀 Servern körs på https://localhost:${PORT}`);
 });
