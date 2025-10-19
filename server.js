@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const passport = require('passport');
@@ -34,17 +35,6 @@ const app = express();
 app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// ✅ Maximal logg: alla inkommande requests
-app.use((req, res, next) => {
-  console.log('--- Ny Request ---');
-  console.log('Metod:', req.method);
-  console.log('URL:', req.originalUrl);
-  console.log('Origin:', req.headers.origin);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
-  next();
-});
-
 // ✅ CORS-konfiguration
 const allowedOrigins = [
   'http://localhost:3000',
@@ -56,13 +46,10 @@ if (process.env.FRONTEND_URL) {
 
 app.use(cors({
   origin: function (origin, callback) {
-    console.log('🌐 CORS check, origin:', origin);
+    console.log('🌐 Incoming request origin:', origin);
     if (!origin) return callback(null, true); // Postman eller server-till-server
     const cleanedOrigin = origin.replace(/\/$/, '');
-    if (allowedOrigins.includes(cleanedOrigin)) {
-      console.log('✅ CORS tillåten för origin:', cleanedOrigin);
-      return callback(null, true);
-    }
+    if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
     console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
     return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
@@ -78,7 +65,11 @@ app.options('*', cors({
 }));
 
 // ✅ JSON & cookies
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    console.log('📦 Raw body:', buf.toString());
+  }
+}));
 app.use(cookieParser());
 
 // ✅ Passport init
@@ -92,27 +83,35 @@ applyMiddleware(app);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// ✅ Test-endpoint för CORS
-app.get('/api/test', (req, res) => {
-  console.log('✅ /api/test anropad från origin:', req.headers.origin);
-  res.json({ message: '✅ CORS fungerar!' });
+// ✅ Logga ALLA inkommande requests
+app.use((req, res, next) => {
+  console.log('--- Ny Request ---');
+  console.log('Method:', req.method);
+  console.log('URL:', req.originalUrl);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  next();
 });
 
 // ✅ API-routes
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Global felhantering med full logg
+// ✅ Test-endpoint (för att kolla CORS från frontend)
+app.get('/api/test', (req, res) => {
+  res.json({ message: '✅ CORS fungerar!' });
+});
+
+// ✅ Global felhantering
 app.use((err, req, res, next) => {
-  console.error('--- Globalt fel ---');
-  console.error('Felmeddelande:', err.message);
-  console.error('Stacktrace:', err.stack);
+  console.error('❌ Global Error:', err.stack);
   res.status(500).json({ error: err.message || 'Något gick fel!' });
 });
 
 // ✅ Starta server
 const PORT = process.env.PORT || 5000;
 
+// 🌟 Lokal utveckling med HTTPS
 if (process.env.NODE_ENV !== 'production' && process.env.HTTPS === 'true') {
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
@@ -122,6 +121,7 @@ if (process.env.NODE_ENV !== 'production' && process.env.HTTPS === 'true') {
     console.log(`🚀 HTTPS-server lokalt på https://localhost:${PORT}`);
   });
 } else {
+  // 🌟 Produktion (Railway hanterar HTTPS)
   app.listen(PORT, () => {
     console.log(`🚀 Backend körs på port ${PORT}`);
   });
