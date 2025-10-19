@@ -20,8 +20,8 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ✅ Kontrollera obligatoriska miljövariabler
-const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'];
-requiredVars.forEach((v) => {
+const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET', 'FRONTEND_URL'];
+requiredVars.forEach(v => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
     process.exit(1);
@@ -34,38 +34,30 @@ const app = express();
 app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
+// ✅ CORS-konfiguration
 const allowedOrigins = [
-  "https://localhost:3000",
-  "https://wisemate.netlify.app",
-  "https://wise-production-2cc4.up.railway.app",
-  process.env.FRONTEND_URL?.replace(/\/$/, '') // tar bort ev. trailing slash
+  'http://localhost:3000',                    // lokal utveckling
+  process.env.FRONTEND_URL,                   // produktion frontend
+  'https://wise-production-2cc4.up.railway.app' // backend URL (om du behöver server-to-server)
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // Postman eller server-till-server
-    const cleanedOrigin = origin.replace(/\/$/, '');
-    if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
-    console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
-    return callback(new Error('CORS-förfrågan blockerad av servern.'));
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true); // t.ex. Postman eller server-side request
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
+      return callback(new Error('CORS-förfrågan blockerad av servern.'));
+    }
   },
   credentials: true,
-  allowedHeaders: [
-    'Origin',
-    'X-Requested-With',
-    'Content-Type',
-    'Accept',
-    'Authorization'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
-// Preflight OPTIONS
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
-
+// ✅ Preflight OPTIONS
+app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
 // ✅ JSON & cookies
 app.use(express.json());
@@ -79,8 +71,8 @@ app.use(passport.initialize());
 applyMiddleware(app);
 
 // ✅ Statisk filhantering
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/favicon.ico', express.static(path.join(__dirname, 'public', 'favicon.ico')));
 
 // ✅ API-routes
 app.use('/api/auth', authRoutes);
