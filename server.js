@@ -34,30 +34,38 @@ const app = express();
 app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// ✅ CORS-konfiguration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "https://localhost:3000",
+  "https://localhost:3000",
   "https://wisemate.netlify.app",
-  "https://din-frontend-production.up.railway.app",
-  "https://wise-production-2cc4.up.railway.app"
+  "https://wise-production-2cc4.up.railway.app",
+  process.env.FRONTEND_URL?.replace(/\/$/, '') // tar bort ev. trailing slash
 ];
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     if (!origin) return callback(null, true); // Postman eller server-till-server
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    const cleanedOrigin = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
+    console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
     return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
   credentials: true,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-// ✅ Preflight OPTIONS
+// Preflight OPTIONS
 app.options('*', cors({
   origin: allowedOrigins,
   credentials: true
 }));
+
 
 // ✅ JSON & cookies
 app.use(express.json());
