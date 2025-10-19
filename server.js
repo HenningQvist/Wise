@@ -7,20 +7,17 @@ const helmet = require('helmet');
 const authRoutes = require('./routes/authRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 const protectedRoutes = require('./routes/protectedRoutes');
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
-// Ladda .env ENDAST i utveckling
+// Ladda .env endast i utveckling (Railway använder miljövariabler direkt)
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
   console.log('🌱 Miljövariabler laddade från .env');
 }
 
 // Kontrollera obligatoriska miljövariabler
-const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET', 'PORT'];
+const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'];
 requiredVars.forEach((v) => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
@@ -30,57 +27,40 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// Middleware för säkerhet och loggning
+// ✅ Säkerhets- och logg-middleware
 app.use(helmet());
 app.use(morgan('dev'));
+
+// ✅ CORS – tillåt frontend från Railway/Vercel
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // Dynamisk origin
+  origin: [
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    "https://wisemate.netlify.app/",     
+    "https://din-frontend-production.up.railway.app"
+  ],
   credentials: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
+
 app.use(express.json());
 app.use(cookieParser());
 
-// Passport
+// ✅ Passport init
 require('./config/passport')(passport);
 app.use(passport.initialize());
 
-// Anpassad middleware
+// ✅ Anpassad middleware
 applyMiddleware(app);
 
-// Statisk filhantering
+// ✅ Statisk filhantering
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// Routes
+// ✅ API routes
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// HTTPS / HTTP fallback
-const PORT = process.env.PORT || 5000;
-
-if (process.env.HTTPS === 'true') {
-  try {
-    const privateKey = fs.readFileSync(process.env.SSL_KEY_FILE, 'utf8');
-    const certificate = fs.readFileSync(process.env.SSL_CRT_FILE, 'utf8');
-    const credentials = { key: privateKey, cert: certificate };
-
-    https.createServer(credentials, app).listen(PORT, () => {
-      console.log(`🚀 HTTPS-servern körs på port ${PORT}`);
-    });
-  } catch (err) {
-    console.warn('⚠️ HTTPS-certifikat kunde inte läsas, fallback till HTTP');
-    http.createServer(app).listen(PORT, () => {
-      console.log(`🚀 HTTP-servern körs på port ${PORT}`);
-    });
-  }
-} else {
-  http.createServer(app).listen(PORT, () => {
-    console.log(`🚀 HTTP-servern körs på port ${PORT}`);
-  });
-}
-
-// Extra CORS-hantering för OPTIONS
+// ✅ Hantera CORS preflight
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
   res.header("Access-Control-Allow-Credentials", "true");
@@ -88,4 +68,10 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
+});
+
+// ✅ Starta servern (Railway använder sin egen HTTPS proxy)
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`🚀 Servern körs i ${process.env.NODE_ENV || 'utveckling'}-läge på port ${PORT}`);
 });
