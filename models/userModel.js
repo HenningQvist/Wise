@@ -1,10 +1,13 @@
 const pool = require('../config/database'); // Se till att poolen är korrekt konfigurerad
 
+// Hjälpfunktion för full table name
+const tableName = 'public.users';
+
 // Hämta användare baserat på e-postadress
 const getUserByEmail = async (email) => {
   console.log('🔹 getUserByEmail:', email);
   try {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await pool.query(`SELECT * FROM ${tableName} WHERE email = $1`, [email]);
     console.log('🔹 Resultat getUserByEmail:', result.rows[0]);
     return result.rows[0];
   } catch (err) {
@@ -17,7 +20,7 @@ const getUserByEmail = async (email) => {
 const getUserByUsername = async (username) => {
   console.log('🔹 getUserByUsername:', username);
   try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await pool.query(`SELECT * FROM ${tableName} WHERE username = $1`, [username]);
     console.log('🔹 Resultat getUserByUsername:', result.rows[0]);
     return result.rows[0];
   } catch (err) {
@@ -32,9 +35,9 @@ async function createUser({ email, username, password, role, personalNumber = nu
   const client = await pool.connect();
   try {
     const query = personalNumber
-      ? `INSERT INTO users (email, username, password, role, personalnumber)
+      ? `INSERT INTO ${tableName} (email, username, password, role, personalnumber)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`
-      : `INSERT INTO users (email, username, password, role)
+      : `INSERT INTO ${tableName} (email, username, password, role)
          VALUES ($1, $2, $3, $4) RETURNING *`;
 
     const values = personalNumber
@@ -56,7 +59,9 @@ async function createUser({ email, username, password, role, personalNumber = nu
 const updateUser = async (id, updatedData) => {
   console.log('🔹 updateUser:', id, updatedData);
   try {
-    const query = 'UPDATE users SET email = $1, username = $2, password = $3, role = $4 WHERE id = $5 RETURNING id, email, username, role';
+    const query = `UPDATE ${tableName} 
+                   SET email = $1, username = $2, password = $3, role = $4 
+                   WHERE id = $5 RETURNING id, email, username, role`;
     const values = [updatedData.email, updatedData.username, updatedData.password, updatedData.role, id];
     const result = await pool.query(query, values);
     console.log('✅ Uppdaterad användare:', result.rows[0]);
@@ -71,7 +76,7 @@ const updateUser = async (id, updatedData) => {
 const deleteUser = async (id) => {
   console.log('🔹 deleteUser:', id);
   try {
-    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    const result = await pool.query(`DELETE FROM ${tableName} WHERE id = $1 RETURNING id`, [id]);
     console.log('✅ Användare borttagen:', result.rows[0]);
     return result.rows.length ? result.rows[0] : null;
   } catch (err) {
@@ -84,7 +89,7 @@ const deleteUser = async (id) => {
 const getUserById = async (id) => {
   console.log('🔹 getUserById:', id);
   try {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    const result = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
     console.log('🔹 Resultat getUserById:', result.rows[0]);
     return result.rows.length ? result.rows[0] : null;
   } catch (err) {
