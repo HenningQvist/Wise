@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ✅ Kontrollera obligatoriska miljövariabler
-const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'];
+const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET', 'FRONTEND_URL'];
 requiredVars.forEach((v) => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
@@ -34,29 +34,41 @@ const app = express();
 app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// 🌐 CORS-konfiguration för produktion + lokal utveckling
-const allowedOrigins = [
-  'https://wisemate.netlify.app', // Produktion
-  'http://localhost:3000'          // Lokal utveckling
-];
+// ✅ Maximal logg: alla inkommande requests
+app.use((req, res, next) => {
+  console.log('--- Ny Request ---');
+  console.log('Metod:', req.method);
+  console.log('URL:', req.originalUrl);
+  console.log('Origin:', req.headers.origin);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  next();
+});
 
-console.log('🌐 Allowed origins:', allowedOrigins);
+// ✅ CORS-konfiguration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://wisemate.netlify.app'
+];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+}
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // t.ex. Postman eller server-till-server
-
+    console.log('🌐 CORS check, origin:', origin);
+    if (!origin) return callback(null, true); // Postman eller server-till-server
     const cleanedOrigin = origin.replace(/\/$/, '');
-    if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
-
+    if (allowedOrigins.includes(cleanedOrigin)) {
+      console.log('✅ CORS tillåten för origin:', cleanedOrigin);
+      return callback(null, true);
+    }
     console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
     return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
   credentials: true,
-  allowedHeaders: [
-    'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'
-  ],
-  methods: ['GET','POST','PUT','DELETE','OPTIONS']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
 // Preflight OPTIONS
@@ -80,23 +92,27 @@ applyMiddleware(app);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// ✅ Test-route för att debugga CORS/live
-app.get('/ping', (req, res) => res.json({ allowedOrigins }));
+// ✅ Test-endpoint för CORS
+app.get('/api/test', (req, res) => {
+  console.log('✅ /api/test anropad från origin:', req.headers.origin);
+  res.json({ message: '✅ CORS fungerar!' });
+});
 
 // ✅ API-routes
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Global felhantering
+// ✅ Global felhantering med full logg
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('--- Globalt fel ---');
+  console.error('Felmeddelande:', err.message);
+  console.error('Stacktrace:', err.stack);
   res.status(500).json({ error: err.message || 'Något gick fel!' });
 });
 
 // ✅ Starta server
 const PORT = process.env.PORT || 5000;
 
-// 🌟 Lokal utveckling med HTTPS
 if (process.env.NODE_ENV !== 'production' && process.env.HTTPS === 'true') {
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
@@ -106,7 +122,6 @@ if (process.env.NODE_ENV !== 'production' && process.env.HTTPS === 'true') {
     console.log(`🚀 HTTPS-server lokalt på https://localhost:${PORT}`);
   });
 } else {
-  // 🌟 Produktion (Railway hanterar HTTPS)
   app.listen(PORT, () => {
     console.log(`🚀 Backend körs på port ${PORT}`);
   });
