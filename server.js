@@ -29,38 +29,40 @@ requiredVars.forEach(v => {
 });
 
 const app = express();
-
-// --- Viktigt för express-rate-limit bakom proxy (Railway, Netlify) ---
-app.set('trust proxy', 1);
+app.set('trust proxy', 1); // Viktigt bakom proxy
 
 // Säkerhet & logg
 app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// --- CORS korrekt inställt ---
+// --- CORS korrekt inställt med logg ---
 const allowedOrigins = [
   'http://localhost:3000',
   'https://wisemate.netlify.app'
 ];
-if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, '').trim());
 
 app.use(cors({
-  origin: function(origin, callback) {
-    console.log('🌐 Incoming request origin:', origin);
-    if (!origin) return callback(null, true); // Postman eller server-till-server
-    const cleanedOrigin = origin.replace(/\/$/, '');
+  origin: (origin, callback) => {
+    const cleanedOrigin = origin?.replace(/\/$/, '').trim();
+    console.log('🌐 Incoming request origin (cleaned):', cleanedOrigin);
+    console.log('✅ Allowed origins:', allowedOrigins);
+
+    if (!origin) return callback(null, true); // Postman / server-till-server
     if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
+
     console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
-    return callback(new Error('CORS-förfrågan blockerad av servern.'));
+    return callback(new Error(`CORS-förfrågan blockerad: ${origin}`));
   },
   credentials: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
+// OPTIONS requests
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
-// JSON & cookies
+// --- Middleware för JSON, cookies och logging av raw body ---
 app.use(express.json({
   verify: (req, res, buf) => { console.log('📦 Raw body:', buf.toString()); }
 }));
@@ -84,6 +86,12 @@ app.use((req, res, next) => {
   console.log('URL:', req.originalUrl);
   console.log('Headers:', req.headers);
   console.log('Body:', req.body);
+
+  // Logga headers som skickas i response
+  res.on('finish', () => {
+    console.log('🔹 Response headers sent:', res.getHeaders());
+  });
+
   next();
 });
 
