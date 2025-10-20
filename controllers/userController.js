@@ -18,17 +18,23 @@ const loginRateLimiter = rateLimit({
 // 🧾 Login
 const loginUser = async (req, res) => {
   try {
+    console.log('📥 Login payload:', req.body);
+
     const { email, password } = req.body;
     if (!email || !password)
       return res.status(400).json({ error: 'Email och lösenord krävs' });
 
     const user = await userModel.getUserByEmail(email);
+    console.log('🔹 Hittad användare:', user);
+
     if (!user) {
       await loginAttemptModel.logLoginAttempt(email, false);
       return res.status(404).json({ error: 'Användare inte hittad' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('🔹 Lösenords-match:', isMatch);
+
     if (!isMatch) {
       await loginAttemptModel.logLoginAttempt(email, false);
       return res.status(401).json({ error: 'Felaktigt lösenord' });
@@ -36,29 +42,27 @@ const loginUser = async (req, res) => {
 
     await loginAttemptModel.logLoginAttempt(email, true);
 
-    // Skapa JWT payload
     const tokenPayload = {
       id: user.id,
       username: user.username,
       role: user.role,
     };
 
-    // Lägg till participant_id endast för deltagare
     if (user.role === 'deltagare' && user.participant_id) {
       tokenPayload.participant_id = user.participant_id;
     }
 
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    });
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    console.log('🔑 Skapad JWT:', token);
 
-    // Skicka cookie (cross-site safe)
+    // Skicka cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'None',
       maxAge: 3600000,
     });
+    console.log('🍪 Cookie skickad:', res.getHeader('Set-Cookie'));
 
     return res.json({
       message: 'Inloggning lyckades!',
@@ -71,6 +75,7 @@ const loginUser = async (req, res) => {
     return res.status(500).json({ error: 'Serverfel vid inloggning' });
   }
 };
+
 
 // 🧾 Registrera användare
 const registerUser = async (req, res) => {
