@@ -1,25 +1,16 @@
 // server.js
 const express = require('express');
 const dotenv = require('dotenv');
-const passport = require('passport');
-const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const path = require('path');
-const fs = require('fs');
-const https = require('https');
-
+const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
-  console.log('🌱 Miljövariabler laddade från .env');
-}
+dotenv.config();
 
-// Kontrollera obligatoriska miljövariabler
 const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET', 'FRONTEND_URL'];
 requiredVars.forEach(v => {
   if (!process.env[v]) {
@@ -29,64 +20,42 @@ requiredVars.forEach(v => {
 });
 
 const app = express();
+app.set('trust proxy', 1); // Viktigt bakom proxy (Railway, Netlify)
 
-// --- Viktigt för express-rate-limit bakom proxy (Railway, Netlify) ---
-app.set('trust proxy', 1);
-
-// Säkerhet & logg
 app.use(helmet());
-if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
+app.use(morgan('combined'));
+app.use(express.json({
+  verify: (req, res, buf) => console.log('📦 Raw body:', buf.toString())
+}));
+app.use(cookieParser());
 
-// Dynamiskt tillåtna origins
+// --- Dynamisk CORS ---
 const allowedOrigins = [];
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
-
-if (process.env.NODE_ENV !== 'production') {
-  allowedOrigins.push('http://localhost:3000'); // utveckling
-}
+console.log('✅ Allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Logga inkommande origin
-    console.log('🌐 Incoming request origin (cleaned):', origin);
-
-    // Postman/server-to-server requests kan ha null origin
-    if (!origin) return callback(null, true);
-
+    if (!origin) return callback(null, true); // Postman/server-to-server
     const cleanedOrigin = origin.replace(/\/$/, '');
     if (allowedOrigins.includes(cleanedOrigin)) {
       console.log('🟢 Origin tillåten:', cleanedOrigin);
       return callback(null, true);
     }
-
-    console.warn('🚫 Blockerad CORS-förfrågan från:', cleanedOrigin);
+    console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
     return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
-  credentials: true, // viktigt för cookies
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  credentials: true,
+  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization'],
   methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
-// Preflight för OPTIONS requests
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
-
-// JSON & cookies
-app.use(express.json({
-  verify: (req, res, buf) => { console.log('📦 Raw body:', buf.toString()); }
-}));
-app.use(cookieParser());
-
-// Passport
-require('./config/passport')(passport);
-app.use(passport.initialize());
-
-// Anpassad middleware
+// Passport + middleware
+require('./config/passport')(require('passport'));
+app.use(require('passport').initialize());
 applyMiddleware(app);
-
-// Statisk filhantering
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
 // Logga alla inkommande requests
 app.use((req, res, next) => {
@@ -98,11 +67,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- API-routes ---
+// API-routes
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// Test-endpoint
+// Test CORS
 app.get('/api/test', (req, res) => {
   res.json({ message: '✅ CORS fungerar!' });
 });
@@ -115,16 +84,4 @@ app.use((err, req, res, next) => {
 
 // Starta server
 const PORT = process.env.PORT || 5000;
-
-// Lokal HTTPS (utveckling)
-if (process.env.NODE_ENV !== 'production' && process.env.HTTPS === 'true') {
-  const httpsOptions = {
-    key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
-    cert: fs.readFileSync(process.env.SSL_CRT_FILE || 'localhost.pem')
-  };
-  https.createServer(httpsOptions, app).listen(PORT, () => {
-    console.log(`🚀 HTTPS-server lokalt på https://localhost:${PORT}`);
-  });
-} else {
-  app.listen(PORT, () => console.log(`🚀 Backend körs på port ${PORT}`));
-}
+app.listen(PORT, () => console.log(`🚀 Backend körs på port ${PORT}`));
