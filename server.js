@@ -14,7 +14,7 @@ const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-// 🌱 Ladda .env bara i utveckling
+// 🌱 Ladda .env i utveckling
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
   console.log('🌱 Miljövariabler laddade från .env');
@@ -30,6 +30,9 @@ requiredVars.forEach((v) => {
 });
 
 const app = express();
+
+// 🖇️ Trust proxy (viktigt för express-rate-limit och cookies bakom proxy)
+app.set('trust proxy', 1); // 1 = första proxy (t.ex. Railway/Netlify)
 
 // ✅ Säkerhet & logg
 app.use(helmet());
@@ -47,7 +50,7 @@ if (process.env.FRONTEND_URL) {
 app.use(cors({
   origin: function (origin, callback) {
     console.log('🌐 Incoming request origin:', origin);
-    if (!origin) return callback(null, true); // Postman eller server-till-server
+    if (!origin) return callback(null, true); // Postman/server-till-server
     const cleanedOrigin = origin.replace(/\/$/, '');
     if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
     console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
