@@ -38,36 +38,35 @@ app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
 // --- CORS korrekt inställt ---
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://wisemate.netlify.app'
-];
-if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, '').trim());
+// --- CORS korrekt inställt ---
+const allowedOrigins = [];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+}
+
+console.log('✅ Allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
-    const cleanedOrigin = origin?.replace(/\/$/, '').trim();
-    console.log('🌐 Incoming request origin (cleaned):', cleanedOrigin);
-    console.log('✅ Allowed origins:', allowedOrigins);
+    console.log('🌐 Incoming request origin (cleaned):', origin ? origin.replace(/\/$/, '') : origin);
 
-    if (!origin) {
-      console.log('🟢 Request utan origin (Postman/server), tillåts');
-      return callback(null, '*');
-    }
+    if (!origin) return callback(null, true); // Postman eller server-till-server
+
+    const cleanedOrigin = origin.replace(/\/$/, '');
     if (allowedOrigins.includes(cleanedOrigin)) {
       console.log('🟢 Origin tillåten:', cleanedOrigin);
-      return callback(null, cleanedOrigin); // Viktigt: returnera origin, inte true
+      return callback(null, true);
     }
 
     console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
-    return callback(new Error(`CORS-förfrågan blockerad: ${origin}`));
+    return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
   credentials: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
-// För att hantera preflight
+// För preflight requests
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
 // JSON & cookies
