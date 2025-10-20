@@ -37,20 +37,21 @@ app.set('trust proxy', 1);
 app.use(helmet());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// --- CORS korrekt inställt ---
-// --- CORS korrekt inställt ---
+// Dynamiskt tillåtna origins
 const allowedOrigins = [];
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
-}
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
 
-console.log('✅ Allowed origins:', allowedOrigins);
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:3000'); // utveckling
+}
 
 app.use(cors({
   origin: function(origin, callback) {
-    console.log('🌐 Incoming request origin (cleaned):', origin ? origin.replace(/\/$/, '') : origin);
+    // Logga inkommande origin
+    console.log('🌐 Incoming request origin (cleaned):', origin);
 
-    if (!origin) return callback(null, true); // Postman eller server-till-server
+    // Postman/server-to-server requests kan ha null origin
+    if (!origin) return callback(null, true);
 
     const cleanedOrigin = origin.replace(/\/$/, '');
     if (allowedOrigins.includes(cleanedOrigin)) {
@@ -58,16 +59,17 @@ app.use(cors({
       return callback(null, true);
     }
 
-    console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
+    console.warn('🚫 Blockerad CORS-förfrågan från:', cleanedOrigin);
     return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
-  credentials: true,
+  credentials: true, // viktigt för cookies
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
-// För preflight requests
+// Preflight för OPTIONS requests
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
+
 
 // JSON & cookies
 app.use(express.json({
