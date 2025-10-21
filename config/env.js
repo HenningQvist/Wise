@@ -1,16 +1,20 @@
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Ladda miljövariabler från två mappar upp
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// 🌍 Ladda .env *endast* lokalt (inte på Railway)
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.join(__dirname, '../../.env') });
+  console.log('🌱 Lokala miljövariabler laddade');
+}
 
-// Exportera miljövariabler med fallback-värden
+// ✅ Exportera miljövariabler
 module.exports = {
   PORT: process.env.PORT || 5000,
-  DB_USER: process.env.DB_USER || 'default_user',
-  DB_HOST: process.env.DB_HOST || 'localhost',
-  DB_NAME: process.env.DB_NAME || 'default_db',
-  DB_PASS: process.env.DB_PASS || 'password',
+  DB_USER: process.env.DB_USER,
+  DB_HOST: process.env.DB_HOST,
+  DB_NAME: process.env.DB_NAME,
+  DB_PASS: process.env.DB_PASS,
   DB_PORT: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-  JWT_SECRET: process.env.JWT_SECRET || 'default_secret',
+  JWT_SECRET: process.env.JWT_SECRET,
+  FRONTEND_URL: process.env.FRONTEND_URL, // 👈 superviktig!
 };
