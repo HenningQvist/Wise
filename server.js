@@ -30,27 +30,32 @@ app.use(express.json({
 app.use(cookieParser());
 
 // --- Dynamisk CORS ---
-const allowedOrigins = [];
-if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+// --- Dynamisk CORS ---
+const allowedOrigins = [
+  process.env.FRONTEND_URL?.replace(/\/$/, '')
+].filter(Boolean);
+
+console.log('✅ FRONTEND_URL:', process.env.FRONTEND_URL);
 console.log('✅ Allowed origins:', allowedOrigins);
 
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // Postman/server-to-server
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Tillåt Postman och server-till-server
     const cleanedOrigin = origin.replace(/\/$/, '');
     if (allowedOrigins.includes(cleanedOrigin)) {
-      console.log('🟢 Origin tillåten:', cleanedOrigin);
+      console.log('🟢 CORS tillåten för:', cleanedOrigin);
       return callback(null, true);
     }
     console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
-    return callback(new Error('CORS-förfrågan blockerad av servern.'));
+    callback(new Error(`CORS-blockerad: ${origin}`));
   },
   credentials: true,
-  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization'],
-  methods: ['GET','POST','PUT','DELETE','OPTIONS']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
+
 
 // Passport + middleware
 require('./config/passport')(require('passport'));
