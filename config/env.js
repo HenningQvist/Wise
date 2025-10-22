@@ -1,12 +1,20 @@
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Ladda rätt .env-fil beroende på miljö
+// Ladda rätt .env-fil beroende på NODE_ENV
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 const envPath = path.join(__dirname, '..', envFile);
 
 dotenv.config({ path: envPath });
 console.log(`✅ Miljövariabler laddade från: ${envFile}`);
+
+// Validering av obligatoriska variabler
+['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'].forEach(key => {
+  if (!process.env[key]) {
+    console.error(`❌ Miljövariabel saknas: ${key}`);
+    process.exit(1);
+  }
+});
 
 module.exports = {
   NODE_ENV: process.env.NODE_ENV,
