@@ -1,16 +1,19 @@
 const { Pool } = require('pg');
-const path = require('path');
-const dotenv = require('dotenv');
-const env = require('./env.js');  // Importera miljövariabler
-
-
+const env = require('./env.js');  // Importera centraliserade miljövariabler
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASS,
-  port: process.env.DB_PORT || 5432, // Använd port från .env eller standard 5432
+  user: env.DB_USER,
+  host: env.DB_HOST,
+  database: env.DB_NAME,
+  password: env.DB_PASS,
+  port: (() => {
+    const port = Number(env.DB_PORT);
+    if (isNaN(port)) {
+      console.error('❌ Ogiltig DB_PORT:', env.DB_PORT, '– använder standard 5432');
+      return 5432;
+    }
+    return port;
+  })(),
 });
 
 // Testa databasanslutning
@@ -26,4 +29,3 @@ process.on('SIGINT', () => {
 });
 
 module.exports = pool;
-
