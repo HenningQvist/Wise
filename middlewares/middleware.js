@@ -1,23 +1,24 @@
+const express = require('express'); // ✅ Lägg till detta
 const cors = require('cors');
-const express = require('express');
 const passport = require('passport');
 
-// Middleware-funktion för att sanera URL:er
+// Sanera URL
 const sanitizeUrl = (req, res, next) => {
-  req.url = req.url.replace(/%0A/g, ''); // Ta bort radbrytningar från URL
+  req.url = req.url.replace(/%0A/g, '');
   req.originalUrl = req.originalUrl.replace(/%0A/g, '');
   next();
 };
 
-// Middleware för felhantering
+// Felhantering
 const errorHandler = (err, req, res, next) => {
-  console.error('❌ Error Stack:', err.stack); // Mer detaljerad loggning
-  res.status(500).json({ message: 'Något gick fel!', error: err.message });
+  console.error('❌ Error Stack:', err.stack);
+  res.status(500).json({
+    message: 'Något gick fel!',
+    error: process.env.NODE_ENV !== 'production' ? err.stack : err.message
+  });
 };
 
-// Exportera middleware
 module.exports = (app) => {
-  // Dynamisk CORS-konfiguration via miljövariabel eller default lokalt
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://localhost:3000')
     .split(',')
     .map(o => o.trim())
@@ -25,23 +26,20 @@ module.exports = (app) => {
 
   const corsOptions = {
     origin: function(origin, callback) {
-      if (!origin) return callback(null, true); // Postman eller server-till-server
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error('CORS-förfrågan blockerad av servern.'));
-      }
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('CORS-förfrågan blockerad av servern.'));
     },
-    credentials: true, // Tillåt användning av cookies
+    credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    methods: ['GET','POST','PUT','DELETE','OPTIONS']
   };
 
   app.use(cors(corsOptions));
-  app.options('*', cors(corsOptions)); // Hantera preflight
+  app.options('*', cors(corsOptions));
 
-  app.use(express.json());
+  app.use(express.json());      // ✅ Behöver express importerad
   app.use(passport.initialize());
-  app.use(sanitizeUrl);  // Sanera URL:er (kan kommenteras för felsökning)
-  app.use(errorHandler); // Global felhantering
+  app.use(sanitizeUrl);
+  app.use(errorHandler);
 };
