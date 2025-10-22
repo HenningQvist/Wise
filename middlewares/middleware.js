@@ -1,45 +1,60 @@
-const express = require('express'); // ✅ Lägg till detta
+// middlewares/middleware.js
 const cors = require('cors');
+const express = require('express');
 const passport = require('passport');
 
-// Sanera URL
+// Middleware-funktion för att sanera URL:er
 const sanitizeUrl = (req, res, next) => {
-  req.url = req.url.replace(/%0A/g, '');
-  req.originalUrl = req.originalUrl.replace(/%0A/g, '');
+  req.url = req.url.replace(/%0A/g, '');          // Ta bort radbrytningar
+  // OBS: originalUrl modifieras inte för säkerhet
   next();
 };
 
-// Felhantering
+// Middleware för felhantering
 const errorHandler = (err, req, res, next) => {
-  console.error('❌ Error Stack:', err.stack);
-  res.status(500).json({
-    message: 'Något gick fel!',
-    error: process.env.NODE_ENV !== 'production' ? err.stack : err.message
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('❌ Error Stack:', err.stack);
+    res.status(500).json({ message: 'Något gick fel!', error: err.message });
+  } else {
+    console.error('❌ Error:', err.message);
+    res.status(500).json({ message: 'Internt serverfel' });
+  }
 };
 
+// Exportera middleware
 module.exports = (app) => {
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://localhost:3000')
+  // Dynamisk CORS-konfiguration
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(o => o.trim())
     .filter(Boolean);
 
+  if (allowedOrigins.length === 0) {
+    console.warn('⚠️ Ingen ALLOWED_ORIGINS satt! CORS kan blockera alla förfrågningar.');
+  } else {
+    console.log('🌍 Tillåtna origins:', allowedOrigins.join(', '));
+  }
+
   const corsOptions = {
     origin: function(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error('CORS-förfrågan blockerad av servern.'));
+      if (!origin) return callback(null, true); // Postman eller server-till-server
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
+        return callback(new Error('CORS-förfrågan blockerad av servern.'));
+      }
     },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET','POST','PUT','DELETE','OPTIONS']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
   };
 
   app.use(cors(corsOptions));
-  app.options('*', cors(corsOptions));
+  app.options('*', cors(corsOptions));  // Preflight
 
-  app.use(express.json());      // ✅ Behöver express importerad
+  app.use(express.json());
   app.use(passport.initialize());
-  app.use(sanitizeUrl);
-  app.use(errorHandler);
+  app.use(sanitizeUrl);  // Sanera URL:er
+  app.use(errorHandler); // Global felhantering
 };
