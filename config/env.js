@@ -1,31 +1,42 @@
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 
-// Bestäm env-fil
+// Välj fil baserat på NODE_ENV
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 const envPath = path.join(__dirname, '..', envFile);
 
-// Ladda miljövariabler
-const result = dotenv.config({ path: envPath });
-if (result.error) {
-  console.error(`❌ Kunde inte ladda miljöfil: ${envFile}`, result.error);
+// Kontrollera att filen finns
+if (!fs.existsSync(envPath)) {
+  console.error(`❌ Kunde inte hitta miljöfil: ${envFile}`);
   process.exit(1);
 }
 
+// Ladda miljövariabler
+dotenv.config({ path: envPath });
 console.log(`✅ Miljövariabler laddade från: ${envFile}`);
 
-// Validering av obligatoriska variabler
-['DB_USER', 'DB_PASS', 'DB_NAME', 'JWT_SECRET'].forEach(key => {
+// Validera obligatoriska variabler
+['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'].forEach(key => {
   if (!process.env[key]) {
     console.error(`❌ Miljövariabel saknas: ${key}`);
     process.exit(1);
   }
 });
 
-// Dynamisk DB-host
-const DB_HOST = process.env.NODE_ENV === 'production'
-  ? process.env.DB_HOST  // t.ex. postgres.railway.internal på Railway
-  : 'localhost';         // lokal utveckling
+// Logga de viktigaste variablerna (maskera lösenord)
+console.log({
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  DB_USER: process.env.DB_USER,
+  DB_HOST: process.env.DB_HOST,
+  DB_NAME: process.env.DB_NAME,
+  DB_PORT: process.env.DB_PORT,
+  JWT_SECRET: process.env.JWT_SECRET ? '********' : undefined,
+  FRONTEND_URL: process.env.FRONTEND_URL,
+  VITE_API_URL: process.env.VITE_API_URL,
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
+});
 
 module.exports = {
   NODE_ENV: process.env.NODE_ENV,
@@ -38,7 +49,7 @@ module.exports = {
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
   DB_USER: process.env.DB_USER,
   DB_PASS: process.env.DB_PASS,
-  DB_HOST,
+  DB_HOST: process.env.DB_HOST,
   DB_NAME: process.env.DB_NAME,
   DB_PORT: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
   JWT_SECRET: process.env.JWT_SECRET,
