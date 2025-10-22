@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const passport = require('passport');
@@ -13,14 +14,21 @@ const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-// Ladda .env i utveckling
+// ==============================
+// Ladda miljövariabler
+// ==============================
 if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
-  console.log('🌱 Miljövariabler laddade från .env');
+  dotenv.config({ path: '.env.development' });
+  console.log('🌱 Miljövariabler laddade från .env.development');
+} else {
+  dotenv.config({ path: '.env.production' });
+  console.log('🌱 Miljövariabler laddade från .env.production');
 }
 
+// ==============================
 // Kontrollera obligatoriska miljövariabler
-const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'];
+// ==============================
+const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET', 'ALLOWED_ORIGINS'];
 requiredVars.forEach((v) => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
@@ -30,72 +38,81 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// ✅ Trust proxy i produktion (om du kör bakom Railway reverse proxy)
+// ==============================
+// Trust proxy (för cookies bakom Railway reverse proxy)
+// ==============================
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// ✅ Säkerhet & logg
+// ==============================
+// Säkerhet & logg
+// ==============================
 app.use(helmet());
+app.use(morgan(process.env.NODE_ENV !== 'production' ? 'dev' : 'combined'));
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
-
-// ✅ CORS-konfiguration
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
+// ==============================
+// CORS
+// ==============================
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
 
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true); // Postman eller server-till-server
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('CORS-förfrågan blockerad av servern.'));
-    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
   credentials: true,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
-// ✅ Hantera preflight (OPTIONS)
+// Hantera preflight
 app.options('*', cors({
   origin: allowedOrigins,
   credentials: true
 }));
 
-// ✅ JSON, cookies
+// ==============================
+// JSON & cookies
+// ==============================
 app.use(express.json());
 app.use(cookieParser());
 
-// ✅ Passport init
+// ==============================
+// Passport init
+// ==============================
 require('./config/passport')(passport);
 app.use(passport.initialize());
 
-// ✅ Anpassad middleware
+// ==============================
+// Anpassad middleware
+// ==============================
 applyMiddleware(app);
 
-// ✅ Statisk filhantering
+// ==============================
+// Statisk filhantering
+// ==============================
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// ✅ API-routes
+// ==============================
+// API-routes
+// ==============================
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Global felhantering
+// ==============================
+// Global felhantering
+// ==============================
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: err.message || 'Något gick fel!' });
 });
 
-// ✅ Starta server
+// ==============================
+// Starta server
+// ==============================
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
@@ -109,8 +126,10 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`🚀 HTTPS-servern körs lokalt på https://localhost:${PORT}`);
   });
 } else {
-  // Produktion (Railway hanterar HTTPS via proxy)
+  // Produktion: Railway hanterar HTTPS
   app.listen(PORT, () => {
     console.log(`🚀 Servern körs i produktion på port ${PORT}`);
   });
 }
+
+module.exports = app;
