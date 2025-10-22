@@ -1,20 +1,31 @@
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Ladda rätt .env-fil beroende på NODE_ENV
+// Bestäm env-fil
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 const envPath = path.join(__dirname, '..', envFile);
 
-dotenv.config({ path: envPath });
+// Ladda miljövariabler
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+  console.error(`❌ Kunde inte ladda miljöfil: ${envFile}`, result.error);
+  process.exit(1);
+}
+
 console.log(`✅ Miljövariabler laddade från: ${envFile}`);
 
 // Validering av obligatoriska variabler
-['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'].forEach(key => {
+['DB_USER', 'DB_PASS', 'DB_NAME', 'JWT_SECRET'].forEach(key => {
   if (!process.env[key]) {
     console.error(`❌ Miljövariabel saknas: ${key}`);
     process.exit(1);
   }
 });
+
+// Dynamisk DB-host
+const DB_HOST = process.env.NODE_ENV === 'production'
+  ? process.env.DB_HOST  // t.ex. postgres.railway.internal på Railway
+  : 'localhost';         // lokal utveckling
 
 module.exports = {
   NODE_ENV: process.env.NODE_ENV,
@@ -27,7 +38,7 @@ module.exports = {
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
   DB_USER: process.env.DB_USER,
   DB_PASS: process.env.DB_PASS,
-  DB_HOST: process.env.DB_HOST,
+  DB_HOST,
   DB_NAME: process.env.DB_NAME,
   DB_PORT: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
   JWT_SECRET: process.env.JWT_SECRET,
