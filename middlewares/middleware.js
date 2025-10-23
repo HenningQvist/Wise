@@ -1,10 +1,8 @@
 const cors = require('cors');
-const express = require('express');
-const passport = require('passport');
 
 // Middleware-funktion för att sanera URL:er
 const sanitizeUrl = (req, res, next) => {
-  req.url = req.url.replace(/%0A/g, ''); // Ta bort radbrytningar
+  req.url = req.url.replace(/%0A/g, '');
   next();
 };
 
@@ -19,9 +17,7 @@ const errorHandler = (err, req, res, next) => {
   }
 };
 
-// Exportera middleware
 module.exports = (app) => {
-  // Dynamisk CORS-konfiguration
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(o => o.trim())
@@ -34,32 +30,23 @@ module.exports = (app) => {
   }
 
   const corsOptions = {
-    origin: function(origin, callback) {
-      if (!origin) return callback(null, true); // Postman eller server-till-server
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // Postman/server
       if (allowedOrigins.includes(origin)) return callback(null, true);
       console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
       return callback(new Error('CORS-förfrågan blockerad av servern.'));
     },
-    credentials: true, // Viktigt för cookies
+    credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET','POST','PUT','DELETE','OPTIONS']
   };
 
-  // ✅ Preflight före andra middleware
+  // Preflight
   app.options('*', cors(corsOptions));
-
-  // ✅ CORS måste komma **före** body-parsing och Passport
+  // CORS
   app.use(cors(corsOptions));
-
-  // ✅ JSON-parsing
-  app.use(express.json());
-
-  // ✅ Passport
-  app.use(passport.initialize());
-
-  // ✅ URL-sanering
+  // URL-sanering
   app.use(sanitizeUrl);
-
-  // ✅ Global felhantering **sist**
+  // Global felhantering sist
   app.use(errorHandler);
 };

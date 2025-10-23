@@ -10,11 +10,13 @@ const https = require('https');
 
 const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
+const applyMiddleware = require('./middlewares/middleware');
 
 // ===== Ladda miljövariabler =====
 dotenv.config();
 console.log(`🌱 Miljövariabler laddade från .env eller .env.production`);
 
+// Kontrollera obligatoriska variabler
 ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'].forEach((v) => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
@@ -24,7 +26,7 @@ console.log(`🌱 Miljövariabler laddade från .env eller .env.production`);
 
 const app = express();
 
-// Trust proxy för produktion
+// Trust proxy för produktion (t.ex. Railway)
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
 // ===== Säkerhet & loggning =====
@@ -35,13 +37,12 @@ app.use(morgan(process.env.NODE_ENV !== 'production' ? 'dev' : 'combined'));
 app.use(express.json());
 app.use(cookieParser());
 
-// ===== Passport init =====
+// ===== Passport init & strategi =====
 require('./config/passport')(passport); // Registrera JWT-strategin
-app.use(passport.initialize());
+app.use(passport.initialize());        // Initiera Passport tidigt
 
-// ===== CORS, sanitize, error-handling (din middleware) =====
-const applyMiddleware = require('./middlewares/middleware');
-applyMiddleware(app);
+// ===== CORS, sanitize, global felhantering =====
+applyMiddleware(app); 
 
 // ===== Statisk filhantering =====
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -51,7 +52,7 @@ app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.i
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ===== Global felhantering =====
+// ===== Global felhantering fallback =====
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: err.message || 'Något gick fel!' });
@@ -61,6 +62,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
+  // Lokalt HTTPS
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
     cert: fs.readFileSync(process.env.SSL_CRT_FILE || 'localhost.pem')
@@ -70,6 +72,7 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`🚀 HTTPS-servern kör lokalt på https://localhost:${PORT}`);
   });
 } else {
+  // Produktion (Railway/Render hanterar HTTPS via proxy)
   app.listen(PORT, () => {
     console.log(`🚀 Servern kör i produktion på port ${PORT}`);
   });
