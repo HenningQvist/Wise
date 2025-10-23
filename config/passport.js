@@ -1,48 +1,61 @@
-const { Strategy, ExtractJwt } = require('passport-jwt');
+const { Strategy: JwtStrategy } = require('passport-jwt');
 const pool = require('./database');
 const dotenv = require('dotenv');
-const cookieParser = require('cookie-parser');  // Importera cookie-parser om du vill använda den direkt här
-
+const cookieParser = require('cookie-parser'); // ✅ Behåll om cookies används
 dotenv.config();
 
-const options = {
-  jwtFromRequest: ExtractJwt.fromExtractors([
-    (req) => {
-      // Logga för att kontrollera om cookies finns på request
-      console.log('🔹 Alla cookies i request:', req.cookies);  // Logga alla cookies för att se om token finns
-      if (!req.cookies.token) {
-        console.log('⚠️ Ingen token hittades i cookies');
-      }
-      return req.cookies.token;  // Extrahera token från cookies
+// 🧩 1. Cookie extractor-funktion
+const cookieExtractor = (req) => {
+  if (req && req.cookies) {
+    console.log('🔹 Alla cookies i request:', req.cookies);
+    const token = req.cookies.jwt || req.cookies.token; // ✅ stöd både 'jwt' och 'token'
+    if (!token) {
+      console.log('⚠️ Ingen JWT hittades i cookies');
+    } else {
+      console.log('✅ JWT hittades i cookie');
     }
-  ]),
+    return token;
+  }
+  console.log('⚠️ Ingen req.cookies hittades (cookie-parser används kanske inte)');
+  return null;
+};
+
+// 🧩 2. Strategy options
+const options = {
+  jwtFromRequest: cookieExtractor, // ✅ använd vår cookieExtractor
   secretOrKey: process.env.JWT_SECRET,
   algorithms: ['HS256'],
 };
 
-const jwtStrategy = new Strategy(options, async (jwtPayload, done) => {
+// 🧩 3. JWT-strategi
+const jwtStrategy = new JwtStrategy(options, async (jwtPayload, done) => {
   try {
-    console.log('🔹 Token extraherad från cookies, payload:', jwtPayload);  // Logga hela JWT-payload
+    console.log('🔹 Payload från JWT:', jwtPayload);
 
-    // Hämta användare från databasen med användarens ID i JWT-payload
+    // Kontrollera att payload innehåller id
+    if (!jwtPayload.id) {
+      console.log('❌ JWT saknar id-fält');
+      return done(null, false, { message: 'Ogiltig token: saknar användar-ID' });
+    }
+
+    // 🔍 Hämta användare från databasen
     const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [jwtPayload.id]);
-    console.log('🔹 Resultat från DB query:', rows);  // Logga resultatet från databasen
+    console.log('🔹 Resultat från DB query:', rows);
 
-    // Om användaren finns, sätt in användaren i req.user
     if (rows.length > 0) {
-      console.log('✅ User found in DB:', rows[0]);
+      console.log('✅ Användare hittad:', rows[0].username || rows[0].email);
       return done(null, rows[0]);
     } else {
-      console.log('❌ User not found with ID:', jwtPayload.id);
+      console.log('❌ Ingen användare hittades med ID:', jwtPayload.id);
       return done(null, false, { message: 'User not found' });
     }
   } catch (err) {
-    console.error('⚠️ Error querying the database:', err);
+    console.error('⚠️ Fel vid DB-sökning:', err);
     return done(err, false);
   }
 });
 
-// Exportera Passport-strategin
+// 🧩 4. Exportera som modul
 module.exports = (passport) => {
   passport.use('jwt', jwtStrategy);
 };
