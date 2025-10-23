@@ -10,15 +10,11 @@ const https = require('https');
 
 const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
-const applyMiddleware = require('./middlewares/middleware');
 
 // ===== Ladda miljövariabler =====
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config();
-  console.log('🌱 Miljövariabler laddade från .env');
-}
+dotenv.config();
+console.log(`🌱 Miljövariabler laddade från .env eller .env.production`);
 
-// Kontrollera obligatoriska variabler
 ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'].forEach((v) => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
@@ -28,22 +24,24 @@ if (process.env.NODE_ENV !== 'production') {
 
 const app = express();
 
-// Trust proxy för produktion (ex. Railway)
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+// Trust proxy för produktion
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
-// ===== Säkerhet och loggning =====
+// ===== Säkerhet & loggning =====
 app.use(helmet());
+app.use(morgan(process.env.NODE_ENV !== 'production' ? 'dev' : 'combined'));
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+// ===== JSON & cookies =====
+app.use(express.json());
+app.use(cookieParser());
 
-// ===== Middleware =====
-applyMiddleware(app); // CORS, sanitize, passport init, error handler
+// ===== Passport init =====
+require('./config/passport')(passport); // Registrera JWT-strategin
+app.use(passport.initialize());
+
+// ===== CORS, sanitize, error-handling (din middleware) =====
+const applyMiddleware = require('./middlewares/middleware');
+applyMiddleware(app);
 
 // ===== Statisk filhantering =====
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -63,18 +61,16 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
-  // Lokalt HTTPS
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
     cert: fs.readFileSync(process.env.SSL_CRT_FILE || 'localhost.pem')
   };
 
   https.createServer(httpsOptions, app).listen(PORT, () => {
-    console.log(`🚀 HTTPS-servern körs lokalt på https://localhost:${PORT}`);
+    console.log(`🚀 HTTPS-servern kör lokalt på https://localhost:${PORT}`);
   });
 } else {
-  // Produktion (Railway hanterar HTTPS via proxy)
   app.listen(PORT, () => {
-    console.log(`🚀 Servern körs i produktion på port ${PORT}`);
+    console.log(`🚀 Servern kör i produktion på port ${PORT}`);
   });
 }
