@@ -1,26 +1,54 @@
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Ladda rätt .env-fil beroende på miljö
+// 🧩 Bestäm vilken .env-fil som ska användas
+// Om NODE_ENV är 'production' → använd .env.production
+// Annars (dev, test) → använd .env
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
-const envPath = path.join(__dirname, '..', envFile);
+const envPath = path.resolve(__dirname, '..', envFile);
 
+// 🧠 Ladda miljövariabler från rätt fil (om den finns)
 dotenv.config({ path: envPath });
-console.log(`✅ Miljövariabler laddade från: ${envFile}`);
 
+// Logga endast i utveckling (för att inte läcka info i prod)
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`✅ Miljövariabler laddade från: ${envFile}`);
+}
+
+// 🧩 Hjälpfunktion för säkra värden
+const getEnv = (key, fallback = undefined) => {
+  const value = process.env[key];
+  if (typeof value === 'undefined' || value === '') {
+    if (fallback === undefined) {
+      console.warn(`⚠️  Saknad miljövariabel: ${key}`);
+    }
+    return fallback;
+  }
+  return value;
+};
+
+// 🧱 Exportera samlade miljövariabler
 module.exports = {
-  NODE_ENV: process.env.NODE_ENV,
-  PORT: process.env.PORT || 5000,
-  HTTPS: process.env.HTTPS === 'true',
-  SSL_CRT_FILE: process.env.SSL_CRT_FILE,
-  SSL_KEY_FILE: process.env.SSL_KEY_FILE,
-  VITE_API_URL: process.env.VITE_API_URL,
-  FRONTEND_URL: process.env.FRONTEND_URL,
-  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
-  DB_USER: process.env.DB_USER,
-  DB_PASS: process.env.DB_PASS,
-  DB_HOST: process.env.DB_HOST,
-  DB_NAME: process.env.DB_NAME,
-  DB_PORT: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-  JWT_SECRET: process.env.JWT_SECRET,
+  NODE_ENV: getEnv('NODE_ENV', 'development'),
+  PORT: getEnv('PORT', 5000),
+
+  // HTTPS-inställningar (för lokal cert)
+  HTTPS: getEnv('HTTPS', 'false') === 'true',
+  SSL_CRT_FILE: getEnv('SSL_CRT_FILE'),
+  SSL_KEY_FILE: getEnv('SSL_KEY_FILE'),
+
+  // Frontend & API
+  FRONTEND_URL: getEnv('FRONTEND_URL', 'http://localhost:3000'),
+  ALLOWED_ORIGINS: getEnv('ALLOWED_ORIGINS', 'http://localhost:3000'),
+  API_URL: getEnv('API_URL') || getEnv('VITE_API_URL'),
+
+  // Databas
+  DB_USER: getEnv('DB_USER'),
+  DB_PASS: String(getEnv('DB_PASS', '')), // alltid string
+  DB_HOST: getEnv('DB_HOST', 'localhost'),
+  DB_NAME: getEnv('DB_NAME', 'testdb'),
+  DB_PORT: Number(getEnv('DB_PORT', 5432)),
+
+  // JWT / säkerhet
+  JWT_SECRET: getEnv('JWT_SECRET', 'fallback_secret_for_dev'),
 };
