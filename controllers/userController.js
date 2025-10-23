@@ -1,143 +1,157 @@
-// controllers/authController.js
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
-const userModel = require('../models/userModel');
-const loginAttemptModel = require('../models/loginAttempt');
+const userModel = require('../models/userModel');  // Importera User Model
+const loginAttemptModel = require('../models/loginAttempt');  // Lägg till denna rad för att importera modellen
 
-// 🕒 Rate limiter för login
+
+// Rate limiter för login-försök
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minuter
-  max: 5,
+  max: 5, // Tillåt 5 inloggningsförsök per IP
   message: 'För många inloggningsförsök. Försök igen om 15 minuter.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.ip, // Använd IP bakom proxy
 });
 
-// 🧾 Login
 const loginUser = async (req, res) => {
   try {
-    console.log('📥 Login payload:', req.body);
-
     const { email, password } = req.body;
-    if (!email || !password)
+
+    // Kontrollera om e-post och lösenord finns med i förfrågan
+    if (!email || !password) {
       return res.status(400).json({ error: 'Email och lösenord krävs' });
+    }
 
+    // Hämta användaren från databasen med hjälp av e-post
     const user = await userModel.getUserByEmail(email);
-    console.log('🔹 Hittad användare:', user);
 
-    if (!user) {
-      await loginAttemptModel.logLoginAttempt(email, false);
+    // Logga inloggningsförsöket oavsett om det lyckas eller inte
+    await loginAttemptModel.logLoginAttempt(email, false);  // Första gången sätter vi success till false
+
+    // Om användaren finns
+    if (user) {
+      // Jämför det angivna lösenordet med det hashade lösenordet i databasen
+      const isMatch = await bcrypt.compare(password, user.password);
+
+      if (isMatch) {
+        // Skapa en JWT-token med användarens information
+        const token = jwt.sign(
+          { 
+            id: user.id, 
+            username: user.username, 
+            role: user.role,
+            admin: user.admin  // Lägg till admin-fält i JWT-token
+          },
+          process.env.JWT_SECRET,  // Hämta JWT-hemlighet från miljövariabler
+          { expiresIn: '1h' }     // Sätt livslängd på token till 1 timme
+        );
+
+        // Skicka token som en säker HTTP-only cookie
+        res.cookie('token', token, {
+          httpOnly: true,         // Förhindrar JavaScript från att komma åt cookien
+          secure: true,           // Tillåt endast HTTPS-anslutningar (rekommenderas även för utveckling)
+          sameSite: 'None',       // Tillåt cookies mellan domäner (t.ex. frontend på annan port)
+          maxAge: 3600000,        // Sätt cookiens livslängd till 1 timme
+        });
+
+        // Lägg till participant_id i en separat cookie
+        res.cookie('participant_id', user.participant_id, {
+          httpOnly: true,         // Förhindrar JavaScript från att komma åt cookien
+          secure: true,           // Tillåt endast HTTPS-anslutningar (rekommenderas även för utveckling)
+          sameSite: 'None',       // Tillåt cookies mellan domäner (t.ex. frontend på annan port)
+          maxAge: 3600000,        // Sätt cookiens livslängd till 1 timme
+        });
+
+        // Uppdatera inloggningsförsöket till 'success' om det lyckades
+        await loginAttemptModel.logLoginAttempt(email, true);  // Nu loggar vi med success = true
+
+        // Skicka tillbaka användardata och admin-status i svaret
+        return res.json({
+          message: 'Inloggning lyckades!',
+          role: user.role,
+          username: user.username,
+          admin: user.admin, // Skicka med admin-statusen i svaret
+        });
+      } else {
+        // Om lösenordet inte matchar
+        return res.status(401).json({ error: 'Felaktigt lösenord' });
+      }
+    } else {
+      // Om användaren inte hittades
       return res.status(404).json({ error: 'Användare inte hittad' });
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log('🔹 Lösenords-match:', isMatch);
-
-    if (!isMatch) {
-      await loginAttemptModel.logLoginAttempt(email, false);
-      return res.status(401).json({ error: 'Felaktigt lösenord' });
-    }
-
-    await loginAttemptModel.logLoginAttempt(email, true);
-
-    const tokenPayload = {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-    };
-
-    if (user.role === 'deltagare' && user.participant_id) {
-      tokenPayload.participant_id = user.participant_id;
-    }
-
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '1h' });
-    console.log('🔑 Skapad JWT:', token);
-
-    // Skicka cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
-      maxAge: 3600000,
-    });
-    console.log('🍪 Cookie skickad:', res.getHeader('Set-Cookie'));
-
-    return res.json({
-      message: 'Inloggning lyckades!',
-      role: user.role,
-      username: user.username,
-      participant_id: tokenPayload.participant_id || null,
-    });
   } catch (err) {
-    console.error('❌ Login error:', err);
+    // Hantera eventuella fel som kan uppstå
+    console.error('Fel vid inloggning:', err);
     return res.status(500).json({ error: 'Serverfel vid inloggning' });
   }
 };
 
-
-// 🧾 Registrera användare
+// Registreringsfunktion
 const registerUser = async (req, res) => {
   try {
     const { email, username, password, role, personalNumber } = req.body;
 
-    if (!email || !username || !password)
+    if (!email || !username || !password) {
       return res.status(400).json({ error: 'Email, användarnamn och lösenord krävs' });
-
-    const usernameRegex = /^[a-zA-Z0-9]+$/;
-    if (!usernameRegex.test(username) || username.length < 3)
-      return res.status(400).json({ error: 'Ogiltigt användarnamn (minst 3 tecken, inga specialtecken)' });
-
-    const existingUser = await userModel.getUserByUsername(username);
-    if (existingUser) return res.status(409).json({ error: 'Användarnamnet är redan registrerat' });
-
-    const existingEmail = await userModel.getUserByEmail(email);
-    if (existingEmail) return res.status(409).json({ error: 'E-postadressen är redan registrerad' });
-
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password))
-      return res.status(400).json({ error: 'Lösenordet måste innehålla minst 8 tecken, en stor bokstav, en siffra och ett specialtecken' });
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const newUserData = {
-      email,
-      username,
-      password: hashedPassword,
-      role: role || 'user',
-      personalNumber: role === 'deltagare' ? personalNumber : null,
-    };
-
-    const newUser = await userModel.createUser(newUserData);
-
-    const tokenPayload = {
-      id: newUser.id,
-      username: newUser.username,
-      role: newUser.role,
-    };
-
-    if (newUser.role === 'deltagare' && newUser.participant_id) {
-      tokenPayload.participant_id = newUser.participant_id;
     }
 
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const userRole = role || 'user';
 
-    return res.status(201).json({ message: 'Registrering lyckades', token });
+    // Validera användarnamn (t.ex. tillåt endast alfanumeriska tecken)
+    const usernameRegex = /^[a-zA-Z0-9]+$/;
+    if (!usernameRegex.test(username) || username.length < 3) {
+      return res.status(400).json({ error: 'Ogiltigt användarnamn (minst 3 tecken, inga specialtecken)' });
+    }
+
+    // Kontrollera om användaren redan finns i databasen
+    const existingUser = await userModel.getUserByUsername(username);
+    if (existingUser) {
+      return res.status(409).json({ error: 'Användarnamnet eller e-posten är redan registrerad' });
+    }
+
+    // Lösenordsvalidering med regex
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({ error: 'Lösenordet måste innehålla minst 8 tecken, en stor bokstav, en siffra och ett specialtecken' });
+    }
+
+    // Kontrollera om lösenordet faktiskt finns och är en icke-null sträng
+    if (!password || password.trim() === '') {
+      return res.status(400).json({ error: 'Lösenordet kan inte vara tomt' });
+    }
+
+    // Hasha lösenordet säkert
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Kontrollera om personalNumber ska inkluderas (om användaren är "deltagare")
+    let newUserData = { email, username, hashedPassword, role: userRole };
+    if (role === 'deltagare' && personalNumber) {
+      newUserData.personalNumber = personalNumber;
+    }
+
+    // Skapa användaren i databasen
+    const newUser = await userModel.createUser(newUserData);
+
+    // Skapa JWT-token direkt efter registrering
+    const token = jwt.sign(
+      { id: newUser.id, username: newUser.username, role: newUser.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.status(201).json({ message: 'Registrering lyckades', token });
   } catch (err) {
-    console.error('❌ Fel vid registrering:', err);
+    console.error('Fel vid registrering:', err);
     return res.status(500).json({ error: 'Serverfel vid registreringen' });
   }
 };
 
-// 🔒 Skyddad rutt
+
+
+// Skyddad rutt
 const protectedRoute = (req, res) => {
   res.json({ message: 'Det här är en skyddad resurs', user: req.user });
 };
 
-module.exports = {
-  loginUser,
-  registerUser,
-  protectedRoute,
-  loginRateLimiter,
-};
+// Exportera controller
+module.exports = { loginUser, registerUser, protectedRoute, loginRateLimiter };
