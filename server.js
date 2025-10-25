@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const passport = require('passport');
 const morgan = require('morgan');
+const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -12,7 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-// Ladda .env lokalt
+// Ladda .env i utveckling
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
   console.log('🌱 Miljövariabler laddade från .env');
@@ -29,50 +30,68 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// ✅ Trust proxy i produktion (viktigt för cookies)
+// ✅ Trust proxy i produktion (om du kör bakom Railway reverse proxy)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// ✅ Grundläggande säkerhet
+// ✅ Säkerhet & logg
 app.use(helmet());
 
-// ✅ Logging
-app.use(morgan(process.env.NODE_ENV !== 'production' ? 'dev' : 'combined'));
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
 
-// ✅ Cookie parser (måste komma före Passport)
+// ✅ CORS-konfiguration
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true); // Postman eller server-till-server
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('CORS-förfrågan blockerad av servern.'));
+    }
+  },
+  credentials: true,
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+}));
+
+// ✅ Hantera preflight (OPTIONS)
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+// ✅ JSON, cookies
+app.use(express.json());
 app.use(cookieParser());
 
-// ✅ Passport-konfiguration
+// ✅ Passport init
 require('./config/passport')(passport);
 app.use(passport.initialize());
 
-// ✅ Global middleware: CORS, URL-sanitizing, JSON
+// ✅ Anpassad middleware
 applyMiddleware(app);
-app.use(express.json());
 
 // ✅ Statisk filhantering
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// ✅ API-rutter
+// ✅ API-routes
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Test /protected rutt med loggar
-app.get('/api/protected-test', passport.authenticate('jwt', { session: false }), (req, res) => {
-  console.log('🔹 /protected-test accessed');
-  console.log('🔹 Cookies i request:', req.cookies);
-  if (!req.user) return res.status(401).json({ message: 'Ej auktoriserad' });
-  res.json({
-    message: 'JWT funkar! Här är användardata:',
-    user: req.user
-  });
-});
-
-// ✅ Global error handler
+// ✅ Global felhantering
 app.use((err, req, res, next) => {
-  console.error('❌ Global error handler:', err.stack);
+  console.error(err.stack);
   res.status(500).json({ error: err.message || 'Något gick fel!' });
 });
 
@@ -80,15 +99,17 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
-  // Lokal HTTPS för cookies
+  // Lokalt HTTPS
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
     cert: fs.readFileSync(process.env.SSL_CRT_FILE || 'localhost.pem')
   };
+
   https.createServer(httpsOptions, app).listen(PORT, () => {
     console.log(`🚀 HTTPS-servern körs lokalt på https://localhost:${PORT}`);
   });
 } else {
+  // Produktion (Railway hanterar HTTPS via proxy)
   app.listen(PORT, () => {
     console.log(`🚀 Servern körs i produktion på port ${PORT}`);
   });
