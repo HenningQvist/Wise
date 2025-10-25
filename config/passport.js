@@ -1,34 +1,44 @@
 const { Strategy, ExtractJwt } = require('passport-jwt');
 const pool = require('./database');
 const dotenv = require('dotenv');
-const cookieParser = require('cookie-parser');  // Importera cookie-parser om du vill använda den direkt här
 
 dotenv.config();
 
+// 🔹 Extraktor för JWT från cookie
+const cookieExtractor = (req) => {
+  if (!req || !req.cookies) {
+    console.log('⚠️ Ingen cookie-parser aktiverad eller inga cookies i request');
+    return null;
+  }
+  console.log('🔹 Alla cookies i request:', req.cookies);
+  const token = req.cookies.token;
+  if (!token) {
+    console.log('⚠️ Ingen token hittades i cookies');
+  }
+  return token || null;
+};
+
+// Passport JWT options
 const options = {
-  jwtFromRequest: ExtractJwt.fromExtractors([
-    (req) => {
-      // Logga för att kontrollera om cookies finns på request
-      console.log('🔹 Alla cookies i request:', req.cookies);  // Logga alla cookies för att se om token finns
-      if (!req.cookies.token) {
-        console.log('⚠️ Ingen token hittades i cookies');
-      }
-      return req.cookies.token;  // Extrahera token från cookies
-    }
-  ]),
+  jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor]),
   secretOrKey: process.env.JWT_SECRET,
   algorithms: ['HS256'],
 };
 
+// 🔐 JWT-strategi
 const jwtStrategy = new Strategy(options, async (jwtPayload, done) => {
   try {
-    console.log('🔹 Token extraherad från cookies, payload:', jwtPayload);  // Logga hela JWT-payload
+    if (!jwtPayload) {
+      console.log('⚠️ Ingen JWT-payload mottagen');
+      return done(null, false);
+    }
 
-    // Hämta användare från databasen med användarens ID i JWT-payload
+    console.log('🔹 Token extraherad från cookies, payload:', jwtPayload);
+
+    // Hämta användare från databasen
     const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [jwtPayload.id]);
-    console.log('🔹 Resultat från DB query:', rows);  // Logga resultatet från databasen
+    console.log('🔹 Resultat från DB query:', rows);
 
-    // Om användaren finns, sätt in användaren i req.user
     if (rows.length > 0) {
       console.log('✅ User found in DB:', rows[0]);
       return done(null, rows[0]);
