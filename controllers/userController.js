@@ -18,8 +18,8 @@ const createToken = (user) => {
   return jwt.sign(
     {
       id: user.id,
-      username: user.username,
-      role: user.role,
+      username: user.username || 'Okänt',
+      role: user.role || 'user',
       admin: user.admin || false,
     },
     process.env.JWT_SECRET,
@@ -32,10 +32,10 @@ const setAuthCookies = (res, token, participant_id = null) => {
   const isProd = process.env.NODE_ENV === 'production';
   const cookieOptions = {
     httpOnly: true,
-    secure: isProd,           // ✅ HTTPS krävs i produktion
-    sameSite: isProd ? 'None' : 'Lax', // ✅ cross-site cookies
+    secure: isProd,
+    sameSite: isProd ? 'None' : 'Lax',
     maxAge: 8 * 60 * 60 * 1000, // 8 timmar
-    path: '/',                 // viktigt för att cookie ska skickas på alla endpoints
+    path: '/',
   };
 
   console.log('🍪 Sätter cookies med inställningar:', cookieOptions);
@@ -56,6 +56,8 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ error: 'Email och lösenord krävs' });
 
     const user = await userModel.getUserByEmail(email);
+    console.log('🍀 User från DB:', user);
+
     if (!user) {
       await loginAttemptModel.logLoginAttempt(email, false);
       return res.status(401).json({ error: 'Felaktig e-post eller lösenord' });
@@ -74,8 +76,8 @@ const loginUser = async (req, res) => {
 
     return res.json({
       message: 'Inloggning lyckades!',
-      username: user.username,
-      role: user.role,
+      username: user.username || 'Okänt',
+      role: user.role || 'user',
       admin: user.admin || false,
       participant_id: user.participant_id || null,
     });
@@ -139,8 +141,8 @@ const registerUser = async (req, res) => {
 
     return res.status(201).json({
       message: 'Registrering lyckades',
-      username: newUser.username,
-      role: newUser.role,
+      username: newUser.username || 'Okänt',
+      role: newUser.role || 'user',
       participant_id: newUser.participant_id || null,
     });
   } catch (err) {
