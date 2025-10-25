@@ -29,37 +29,48 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// ✅ Trust proxy i produktion (Railway kräver detta för cookies)
+// ✅ Trust proxy i produktion (viktigt för cookies)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
 // ✅ Grundläggande säkerhet
 app.use(helmet());
+
+// ✅ Logging
 app.use(morgan(process.env.NODE_ENV !== 'production' ? 'dev' : 'combined'));
 
 // ✅ Cookie parser (måste komma före Passport)
 app.use(cookieParser());
 
-// ✅ Passport
+// ✅ Passport-konfiguration
 require('./config/passport')(passport);
 app.use(passport.initialize());
 
-// ✅ Vår samlade middleware (inkl. CORS, URL-sanitizing)
+// ✅ Global middleware: CORS, URL-sanitizing, JSON
 applyMiddleware(app);
-
-// ✅ JSON-body parser
 app.use(express.json());
 
 // ✅ Statisk filhantering
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.ico")));
 
-// ✅ API-routes
+// ✅ API-rutter
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Global felhantering (sist i kedjan)
+// ✅ Test /protected rutt med loggar
+app.get('/api/protected-test', passport.authenticate('jwt', { session: false }), (req, res) => {
+  console.log('🔹 /protected-test accessed');
+  console.log('🔹 Cookies i request:', req.cookies);
+  if (!req.user) return res.status(401).json({ message: 'Ej auktoriserad' });
+  res.json({
+    message: 'JWT funkar! Här är användardata:',
+    user: req.user
+  });
+});
+
+// ✅ Global error handler
 app.use((err, req, res, next) => {
   console.error('❌ Global error handler:', err.stack);
   res.status(500).json({ error: err.message || 'Något gick fel!' });
@@ -69,17 +80,15 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
-  // Lokal HTTPS för cookies via localhost
+  // Lokal HTTPS för cookies
   const httpsOptions = {
     key: fs.readFileSync(process.env.SSL_KEY_FILE || 'localhost-key.pem'),
     cert: fs.readFileSync(process.env.SSL_CRT_FILE || 'localhost.pem')
   };
-
   https.createServer(httpsOptions, app).listen(PORT, () => {
     console.log(`🚀 HTTPS-servern körs lokalt på https://localhost:${PORT}`);
   });
 } else {
-  // Produktion
   app.listen(PORT, () => {
     console.log(`🚀 Servern körs i produktion på port ${PORT}`);
   });
