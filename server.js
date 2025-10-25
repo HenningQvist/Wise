@@ -44,7 +44,7 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('combined'));
 }
 
-// ✅ CORS-konfiguration
+// ✅ CORS-konfiguration för cookies
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
@@ -52,22 +52,25 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // Postman eller server-till-server
+    // Postman eller server-till-server requests kan ha undefined origin
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
       return callback(new Error('CORS-förfrågan blockerad av servern.'));
     }
   },
-  credentials: true,
+  credentials: true, // 🔑 tillåter cookies
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-// ✅ Hantera preflight (OPTIONS)
+// ✅ Hantera preflight korrekt med credentials
 app.options('*', cors({
   origin: allowedOrigins,
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
 // ✅ JSON, cookies
