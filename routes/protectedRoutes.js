@@ -12,26 +12,38 @@ const networkRoutes = require('./networkRoutes');
 const followUpRouter = require('./followUpRouter');
 const summaryRoutes = require('./summaryRoutes');
 
-const hasAdminRights = require('../middlewares/roleMiddleware'); // Importera admin-middleware
+const hasAdminRights = require('../middlewares/roleMiddleware'); 
 const router = express.Router();
 
-// Middleware för att hantera cookies och autentisering
+// Middleware för cookies och autentisering
 router.use(cookieParser());
+
+// Logga cookies på varje request för debug
+router.use((req, res, next) => {
+  console.log('🔹 Request cookies:', req.cookies);
+  next();
+});
+
+// Passport JWT auth
 router.use(passport.authenticate('jwt', { session: false }));
 
-// Skyddad rutt
+// Skyddad rutt med debug
 router.get('/protected', (req, res) => {
-  console.log('Received request to /protected');
+  console.log('🔹 /protected accessed');
+  console.log('🔹 req.user:', req.user);
+  
   if (!req.user) {
+    console.log('⚠️ Ingen JWT hittades eller den är ogiltig');
     return res.status(401).json({ message: 'Ej auktoriserad' });
   }
+
   res.json({
     message: 'Det här är en skyddad resurs',
     user: req.user
   });
 });
 
-// Inkludera andra skyddade rutter
+// Inkludera övriga skyddade rutter
 router.use(participantRoutes);
 router.use(insatsRouter);
 router.use(tipRoutes);
@@ -42,9 +54,8 @@ router.use(networkRoutes);
 router.use(followUpRouter);
 router.use(summaryRoutes);
 
-
-// Lägg till admin-middleware FÖRE admin-rutterna
-router.use(hasAdminRights); // Kollar om användaren är admin innan de får åtkomst
-router.use(adminRoutes); // Alla admin-rutter skyddas nu automatiskt
+// Admin-middleware före admin-rutterna
+router.use(hasAdminRights); 
+router.use(adminRoutes);
 
 module.exports = router;
