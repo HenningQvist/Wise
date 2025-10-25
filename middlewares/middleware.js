@@ -1,4 +1,3 @@
-// middlewares/middleware.js
 const cors = require('cors');
 const express = require('express');
 const passport = require('passport');
@@ -26,12 +25,14 @@ module.exports = (app) => {
 
   const corsOptions = {
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // Postman/server
+      // Tillåt preflight/förfrågningar utan origin
+      if (!origin) return callback(null, true);
+
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       } else {
         console.warn('🚫 Blockerad CORS-förfrågan från:', origin);
-        return callback(new Error('CORS-förfrågan blockerad av servern.'));
+        return callback(null, false); // Blockera men returnera ej error (viktigt för cookies)
       }
     },
     credentials: true, // ✅ Viktigt för cookies
