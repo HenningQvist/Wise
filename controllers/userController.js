@@ -4,6 +4,8 @@ const rateLimit = require('express-rate-limit');
 const userModel = require('../models/userModel');
 const loginAttemptModel = require('../models/loginAttempt');
 
+const AUTH_MODE = process.env.AUTH_MODE || 'cookie'; // 'cookie' eller 'header'
+
 // 🛡️ RATE LIMITER för login
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minuter
@@ -27,7 +29,7 @@ const createToken = (user) => {
   );
 };
 
-// 🔐 Hjälpfunktion: sätt cookies
+// 🔐 Hjälpfunktion: sätt cookies (endast om cookie-läge)
 const setAuthCookies = (res, token, participant_id = null) => {
   const isProd = process.env.NODE_ENV === 'production';
   const cookieOptions = {
@@ -72,15 +74,30 @@ const loginUser = async (req, res) => {
     await loginAttemptModel.logLoginAttempt(email, true);
 
     const token = createToken(user);
-    setAuthCookies(res, token, user.participant_id || null);
 
-    return res.json({
-      message: 'Inloggning lyckades!',
-      username: user.username || 'Okänt',
-      role: user.role || 'user',
-      admin: user.admin || false,
-      participant_id: user.participant_id || null,
-    });
+    // 🔹 Hantera auth baserat på läge
+    if (AUTH_MODE === 'cookie') {
+      console.log('🍪 AUTH_MODE = cookie → skickar token som cookie');
+      setAuthCookies(res, token, user.participant_id || null);
+
+      return res.json({
+        message: 'Inloggning lyckades (cookie-läge)',
+        username: user.username || 'Okänt',
+        role: user.role || 'user',
+        admin: user.admin || false,
+        participant_id: user.participant_id || null,
+      });
+    } else {
+      console.log('📦 AUTH_MODE = header → skickar token i svar');
+      return res.json({
+        message: 'Inloggning lyckades (header-läge)',
+        token,
+        username: user.username || 'Okänt',
+        role: user.role || 'user',
+        admin: user.admin || false,
+        participant_id: user.participant_id || null,
+      });
+    }
   } catch (err) {
     console.error('❌ Fel vid inloggning:', err);
     return res.status(500).json({ error: 'Serverfel vid inloggning' });
@@ -137,13 +154,18 @@ const registerUser = async (req, res) => {
     }
 
     const token = createToken(newUser);
-    setAuthCookies(res, token, newUser.participant_id || null);
+
+    if (AUTH_MODE === 'cookie') {
+      console.log('🍪 Registrering i cookie-läge → sätter cookies');
+      setAuthCookies(res, token, newUser.participant_id || null);
+    }
 
     return res.status(201).json({
       message: 'Registrering lyckades',
       username: newUser.username || 'Okänt',
       role: newUser.role || 'user',
       participant_id: newUser.participant_id || null,
+      ...(AUTH_MODE === 'header' && { token }),
     });
   } catch (err) {
     console.error('❌ Fel vid registrering:', err);
@@ -153,8 +175,11 @@ const registerUser = async (req, res) => {
 
 // 🟡 LOGOUT
 const logoutUser = (req, res) => {
-  res.clearCookie('token', { path: '/' });
-  res.clearCookie('participant_id', { path: '/' });
+  if (AUTH_MODE === 'cookie') {
+    res.clearCookie('token', { path: '/' });
+    res.clearCookie('participant_id', { path: '/' });
+    console.log('🚪 Rensade cookies vid utloggning');
+  }
   return res.json({ message: 'Utloggning lyckades' });
 };
 

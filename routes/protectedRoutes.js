@@ -33,7 +33,7 @@ router.use((req, res, next) => {
 // 🔹 2. Cookie parser (måste vara först innan Passport)
 router.use(cookieParser());
 
-// 🔹 3. Passport JWT-auth som hämtar token från cookie
+// 🔹 3. Passport JWT-auth (stöd för cookie eller Authorization-header)
 router.use((req, res, next) => {
   passport.authenticate('jwt', { session: false }, (err, user, info) => {
     if (err) console.error('❌ Auth error:', err);

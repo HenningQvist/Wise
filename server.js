@@ -30,7 +30,7 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// ✅ Viktigt: aktivera proxy-läge FÖRE allt annat (Railway kräver detta för Secure cookies)
+// ✅ Viktigt: aktivera proxy-läge FÖRE allt annat (krävs för Secure cookies bakom proxy)
 app.set('trust proxy', 1);
 
 // ✅ Säkerhet & loggning
@@ -48,7 +48,7 @@ console.log('🌍 Tillåtna origins:', allowedOrigins);
 const corsOptions = {
   origin: function (origin, callback) {
     console.log('🔹 CORS-förfrågan från origin:', origin);
-    if (!origin) return callback(null, true); // tillåt t.ex. Postman
+    if (!origin) return callback(null, true); // t.ex. Postman
     if (allowedOrigins.includes(origin)) {
       console.log('✅ CORS tillåten för:', origin);
       return callback(null, true);
@@ -63,17 +63,16 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// ✅ Hantera preflight med credentials
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptions)); // Preflight
 
 // ✅ JSON och cookies
 app.use(express.json());
 app.use(cookieParser());
 
-// 🔍 Logga inkommande cookies (hjälper dig se varför token saknas)
+// 🔍 Logga inkommande cookies och Authorization-header
 app.use((req, res, next) => {
   console.log('🍪 Inkommande cookies:', req.cookies);
+  console.log('🔑 Authorization-header:', req.headers.authorization || 'Ingen');
   next();
 });
 

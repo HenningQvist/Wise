@@ -6,48 +6,68 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 /**
- * 🔹 Hämtar JWT-token från cookies
+ * 🧩 Dynamisk token-extraktor beroende på AUTH_MODE
  */
 const cookieExtractor = (req) => {
   if (!req || !req.cookies) {
     console.log('⚠️ Ingen cookie-parser aktiverad eller inga cookies i request');
     return null;
   }
-
   const token = req.cookies.token;
-  if (!token) {
-    console.log('⚠️ Ingen JWT-token hittades i cookies');
-    return null;
+  if (!token) console.log('⚠️ Ingen JWT-token hittades i cookies');
+  else console.log('🍪 JWT-token hittad i cookie');
+  return token || null;
+};
+
+/**
+ * 🔹 Kombinerad extraktor: cookie + Authorization-header
+ */
+const dynamicExtractor = (req) => {
+  const mode = process.env.AUTH_MODE || 'cookie';
+
+  // Först: cookie-läge
+  if (mode === 'cookie') {
+    const token = cookieExtractor(req);
+    if (token) return token;
   }
 
-  console.log('🍪 Cookie hittad → token existerar');
-  return token;
+  // Alternativt: Authorization header-läge
+  const authHeader = req?.headers?.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    console.log('📦 JWT-token hittad i Authorization-header');
+    return authHeader.split(' ')[1];
+  }
+
+  console.log('🚫 Ingen token hittades i cookie eller header');
+  return null;
 };
 
 /**
- * 🔐 JWT-konfig
+ * 🔐 JWT-konfiguration
  */
 const options = {
-  jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor]),
+  jwtFromRequest: ExtractJwt.fromExtractors([dynamicExtractor]),
   secretOrKey: process.env.JWT_SECRET,
   algorithms: ['HS256'],
-  ignoreExpiration: false, // extra säkerhet
+  ignoreExpiration: false,
 };
 
 /**
- * 🧩 JWT-strategi
+ * 🧠 JWT-strategi
  */
 const jwtStrategy = new Strategy(options, async (jwtPayload, done) => {
   try {
     if (!jwtPayload) {
-      console.log('⚠️ Ingen JWT-payload mottagen');
+      console.warn('⚠️ Ingen JWT-payload mottagen');
       return done(null, false);
     }
 
     console.log('🔹 JWT payload mottagen:', jwtPayload);
 
-    // 🔍 Hämta användaren från databasen
-    const { rows } = await pool.query('SELECT id, username, email, role, admin, participant_id FROM users WHERE id = $1', [jwtPayload.id]);
+    const { rows } = await pool.query(
+      'SELECT id, username, email, role, admin, participant_id FROM users WHERE id = $1',
+      [jwtPayload.id]
+    );
 
     if (rows.length === 0) {
       console.warn('❌ Ingen användare hittades för ID:', jwtPayload.id);
@@ -55,9 +75,8 @@ const jwtStrategy = new Strategy(options, async (jwtPayload, done) => {
     }
 
     const user = rows[0];
-    console.log('✅ Autentiserad användare:', user.username, '| Roll:', user.role);
+    console.log(`✅ Autentiserad användare: ${user.username} (roll: ${user.role})`);
 
-    // 🧹 Ta inte med lösenord eller känsliga fält
     return done(null, {
       id: user.id,
       username: user.username,
@@ -68,25 +87,25 @@ const jwtStrategy = new Strategy(options, async (jwtPayload, done) => {
     });
 
   } catch (err) {
-    console.error('💥 Fel vid JWT-verifiering eller DB-query:', err);
+    console.error('💥 Fel vid JWT-verifiering eller databasfråga:', err);
     return done(err, false);
   }
 });
 
 /**
- * 🧠 Exportera och aktivera strategin i Passport
+ * 🚀 Exportera strategin
  */
 module.exports = (passport) => {
   passport.use('jwt', jwtStrategy);
 
-  // Valfritt: enkel serialize/deserialize (för debug eller hybrid-sessioner)
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
+  // Endast för felsökning / framtida sessioner
+  passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id, done) => {
     try {
-      const { rows } = await pool.query('SELECT id, username, role, admin FROM users WHERE id = $1', [id]);
+      const { rows } = await pool.query(
+        'SELECT id, username, role, admin FROM users WHERE id = $1',
+        [id]
+      );
       done(null, rows[0]);
     } catch (err) {
       done(err, null);
