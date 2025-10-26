@@ -18,7 +18,7 @@ const hasAdminRights = require('../middlewares/roleMiddleware');
 
 const router = express.Router();
 
-// 🔹 1. Logga inkommande request — innan allt annat
+// 🔹 1. Logga inkommande request
 router.use((req, res, next) => {
   console.log('\n==============================');
   console.log('📥 NY REQUEST:', req.method, req.originalUrl);
@@ -33,32 +33,24 @@ router.use((req, res, next) => {
 // 🔹 2. Cookie parser (måste vara först innan Passport)
 router.use(cookieParser());
 
-// 🔹 3. Logga efter att cookies har parsats
+// 🔹 3. Passport JWT-auth som hämtar token från cookie
 router.use((req, res, next) => {
-  console.log('🍪 Efter cookieParser → req.cookies:', req.cookies);
-  next();
-});
-
-// 🔹 4. Passport-auth middleware
-router.use((req, res, next) => {
-  console.log('🔐 Kör passport.authenticate(jwt)...');
   passport.authenticate('jwt', { session: false }, (err, user, info) => {
-    console.log('🧩 Passport callback →');
     if (err) console.error('❌ Auth error:', err);
-    if (info) console.warn('⚠️ Auth info:', info);
-    if (!user) console.warn('🚫 Ingen användare hittad via JWT.');
-    else console.log('✅ Användare hittad:', user);
+    if (info) console.warn('⚠️ Auth info:', info.message || info);
 
-    req.user = user;
+    req.user = user || null;
+
+    console.log('🍪 Cookies efter parser:', req.cookies);
+    console.log('👤 req.user efter auth:', req.user);
+
     next();
   })(req, res, next);
 });
 
-// 🔹 5. Skyddad test-rutt
+// 🔹 4. Skyddad test-rutt
 router.get('/protected', (req, res) => {
-  console.log('\n🧱 /protected endpoint körs');
-  console.log('🍪 Cookies i request:', req.cookies);
-  console.log('👤 req.user:', req.user);
+  console.log('🧱 /protected endpoint körs');
   if (!req.user) {
     console.warn('🚫 Ej autentiserad → 401');
     return res.status(401).json({ message: 'Ej auktoriserad', cookies: req.cookies });
@@ -70,7 +62,7 @@ router.get('/protected', (req, res) => {
   });
 });
 
-// 🔹 6. Andra skyddade rutter
+// 🔹 5. Andra skyddade rutter
 router.use((req, res, next) => {
   console.log('➡️ Routing till undersystem:', req.originalUrl);
   next();
@@ -85,7 +77,7 @@ router.use(networkRoutes);
 router.use(followUpRouter);
 router.use(summaryRoutes);
 
-// 🔹 7. Admin-rutter — med rollkontroll
+// 🔹 6. Admin-rutter med rollkontroll
 router.use((req, res, next) => {
   console.log('👮 Kontroll av adminrättigheter...');
   next();
@@ -93,7 +85,7 @@ router.use((req, res, next) => {
 router.use(hasAdminRights);
 router.use(adminRoutes);
 
-// 🔹 8. Global logg om något går fel i protected routes
+// 🔹 7. Global felhantering
 router.use((err, req, res, next) => {
   console.error('💥 FEL I PROTECTED ROUTES:', err);
   res.status(500).json({ error: 'Internt serverfel', details: err.message });
