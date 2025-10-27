@@ -1,6 +1,6 @@
 const express = require('express');
-const { loginUser, registerUser, loginRateLimiter } = require('../controllers/userController'); // Controller-funktioner
-const { protect } = require('../middlewares/authMiddleware'); // JWT-verifieringsmiddleware
+const { loginUser, registerUser, loginRateLimiter } = require('../controllers/userController');
+const { authenticateUser } = require('../middlewares/authMiddleware'); // Korrekt namn
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ router.post('/login', loginRateLimiter, loginUser);
 router.post('/register', registerUser);
 
 // 👤 GET /auth/userinfo – kräver JWT
-router.get('/userinfo', protect, (req, res) => {
+router.get('/userinfo', authenticateUser, (req, res) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
