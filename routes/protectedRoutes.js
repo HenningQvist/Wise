@@ -1,6 +1,4 @@
 const express = require('express');
-const passport = require('passport');
-const cookieParser = require('cookie-parser');
 const participantRoutes = require('./participantRoutes'); 
 const insatsRouter = require('./insatsRouter');
 const tipRoutes = require('./tipRoutes');
@@ -12,19 +10,17 @@ const networkRoutes = require('./networkRoutes');
 const followUpRouter = require('./followUpRouter');
 const summaryRoutes = require('./summaryRoutes');
 
-const hasAdminRights = require('../middlewares/roleMiddleware'); // Importera admin-middleware
+const { authenticateUser } = require('../middlewares/authMiddleware'); // JWT-middleware
+const hasAdminRights = require('../middlewares/roleMiddleware'); // Admin-middleware
+
 const router = express.Router();
 
-// Middleware för att hantera cookies och autentisering
-router.use(cookieParser());
-router.use(passport.authenticate('jwt', { session: false }));
+// 🔒 Alla rutter under denna middleware kräver JWT
+router.use(authenticateUser);
 
-// Skyddad rutt
+// Skyddad test-rutt
 router.get('/protected', (req, res) => {
   console.log('Received request to /protected');
-  if (!req.user) {
-    return res.status(401).json({ message: 'Ej auktoriserad' });
-  }
   res.json({
     message: 'Det här är en skyddad resurs',
     user: req.user
@@ -42,9 +38,8 @@ router.use(networkRoutes);
 router.use(followUpRouter);
 router.use(summaryRoutes);
 
-
-// Lägg till admin-middleware FÖRE admin-rutterna
-router.use(hasAdminRights); // Kollar om användaren är admin innan de får åtkomst
-router.use(adminRoutes); // Alla admin-rutter skyddas nu automatiskt
+// 🔑 Admin-rutter kräver först JWT och sedan admin-rights
+router.use(hasAdminRights);
+router.use(adminRoutes);
 
 module.exports = router;
