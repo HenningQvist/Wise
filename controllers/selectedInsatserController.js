@@ -35,13 +35,10 @@ const getSelectedInsatserController = async (req, res) => {
   try {
     const selectedInsatser = await getSelectedInsatser(participantId);
 
-    if (!selectedInsatser || selectedInsatser.length === 0) {
-      return res.status(404).json({ message: 'Inga insatser hittades för denna deltagare.' });
-    }
-
+    // Returnera alltid array, även om tom
     res.status(200).json({
       message: 'Valda insatser hämtades framgångsrikt!',
-      selectedInsatser,
+      selectedInsatser: selectedInsatser || [],
     });
   } catch (error) {
     console.error('❌ Fel vid hämtning av valda insatser:', error);
@@ -56,13 +53,10 @@ const getAllSelectedInsatserController = async (req, res) => {
   try {
     const allSelectedInsatser = await getAllSelectedInsatser();
 
-    if (!allSelectedInsatser || allSelectedInsatser.length === 0) {
-      return res.status(404).json({ message: 'Inga insatser hittades.' });
-    }
-
+    // Returnera alltid array, även om tom
     res.status(200).json({
       message: 'Alla valda insatser hämtades framgångsrikt!',
-      selectedInsatser: allSelectedInsatser,
+      selectedInsatser: allSelectedInsatser || [],
     });
   } catch (error) {
     console.error('❌ Fel vid hämtning av alla valda insatser:', error);
