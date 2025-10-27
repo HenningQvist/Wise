@@ -1,27 +1,21 @@
 const networkModel = require("../models/networkModel");
 
-
 // Hämta nätverk baserat på participantId
 const getNetwork = async (req, res) => {
   const participantId = req.params.id;
   console.log(`Försöker hämta nätverk för participantId: ${participantId}`);
 
   try {
-    const nodes = await networkModel.getNetworkByParticipant(participantId);  // <-- fixat här
+    const nodes = await networkModel.getNetworkByParticipant(participantId);
     console.log(`Noder hämtade: ${JSON.stringify(nodes)}`);
 
-    if (!nodes || nodes.length === 0) {
-      console.log(`Inget nätverk hittades för participantId: ${participantId}`);
-      return res.status(404).json({ error: "Inget nätverk hittades för deltagaren." });
-    }
-
-    res.json(nodes);
+    // Returnera alltid en array, även om inga noder finns
+    res.json(Array.isArray(nodes) ? nodes : []);
   } catch (err) {
     console.error("Fel vid hämtning av nätverk:", err);
     res.status(500).json({ error: "Något gick fel vid hämtning." });
   }
 };
-
 
 // Spara nätverk för en deltagare
 const saveNetwork = async (req, res) => {
