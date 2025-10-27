@@ -12,15 +12,14 @@ const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-// 🔹 Ladda .env i utveckling
+// 🔹 Ladda .env
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
   console.log('🌱 Miljövariabler laddade från .env');
 }
 
 // 🔹 Kontrollera obligatoriska miljövariabler
-const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'];
-requiredVars.forEach((v) => {
+['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'].forEach(v => {
   if (!process.env[v]) {
     console.error(`❌ Saknad miljövariabel: ${v}`);
     process.exit(1);
@@ -29,34 +28,25 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// ✅ Trust proxy i produktion (om du kör bakom Railway reverse proxy)
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+// ✅ Trust proxy i produktion
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
 // ✅ Säkerhet & logg
 app.use(helmet());
 app.use(process.env.NODE_ENV !== 'production' ? morgan('dev') : morgan('combined'));
 
-// ✅ Dynamisk CORS-konfiguration
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
-const corsOptions = {
+// ✅ CORS
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('CORS-förfrågan blockerad av servern.'));
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
   credentials: true,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Preflight
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization']
+}));
+app.options('*', cors()); // preflight
 
 // ✅ JSON & cookies
 app.use(express.json());
@@ -73,37 +63,36 @@ app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.i
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Global felhantering
+// ✅ Hantera 404 på alla övriga rutter
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// ✅ Global felhantering med JSON-svar
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message || 'Något gick fel!' });
+  console.error('💥 Server error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Något gick fel!',
+    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
+  });
 });
 
 // ✅ Starta server
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
-  // Lokalt HTTPS med fallback om certifikat saknas
   const keyFile = process.env.SSL_KEY_FILE || 'localhost-key.pem';
   const crtFile = process.env.SSL_CRT_FILE || 'localhost.pem';
 
   if (fs.existsSync(keyFile) && fs.existsSync(crtFile)) {
-    const httpsOptions = {
-      key: fs.readFileSync(keyFile),
-      cert: fs.readFileSync(crtFile)
-    };
+    const httpsOptions = { key: fs.readFileSync(keyFile), cert: fs.readFileSync(crtFile) };
     https.createServer(httpsOptions, app).listen(PORT, () => {
-      console.log(`🚀 HTTPS-servern kör lokalt på https://localhost:${PORT}`);
+      console.log(`🚀 HTTPS-server lokalt på https://localhost:${PORT}`);
     });
   } else {
-    console.warn('⚠️ Lokala SSL-filer saknas, startar HTTP istället');
-    app.listen(PORT, () => {
-      console.log(`🚀 HTTP-servern kör lokalt på http://localhost:${PORT}`);
-    });
+    console.warn('⚠️ SSL-filer saknas, startar HTTP istället');
+    app.listen(PORT, () => console.log(`🚀 HTTP-server lokalt på http://localhost:${PORT}`));
   }
 } else {
-  // Produktion (Railway hanterar HTTPS via proxy)
-  app.listen(PORT, () => {
-    console.log(`🚀 Servern körs i produktion på port ${PORT}`);
-  });
+  app.listen(PORT, () => console.log(`🚀 Servern körs i produktion på port ${PORT}`));
 }
