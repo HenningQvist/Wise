@@ -1,7 +1,11 @@
 const decisionsModel = require('../models/decisionsModel');
 
-// Skapa beslut
+// 🔒 Skapa beslut
 const createDecision = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   const { 
     bestallare,
     insats,
@@ -13,27 +17,15 @@ const createDecision = async (req, res) => {
     ansvarig,
     handledare,
     telefon,
-    kategori // <- Hämta kategori från req.body
+    kategori
   } = req.body;
 
   const participantId = req.params.participantId;
   const insatsId = req.params.insatsId;
 
-  // Logga alla inkommande fält
-  console.log('Received decision data:');
-  console.log('bestallare:', bestallare);
-  console.log('insats:', insats);
-  console.log('beslut:', beslut);
-  console.log('startDate:', startDate);
-  console.log('endDate:', endDate);
-  console.log('executor:', executor);
-  console.log('workplace:', workplace);
-  console.log('ansvarig:', ansvarig);
-  console.log('handledare:', handledare);
-  console.log('telefon:', telefon);
-  console.log('kategori:', kategori); // <- Logga kategori
+  console.log('Received decision data:', req.body);
 
-  // Validera om alla obligatoriska fält är ifyllda
+  // Validering av obligatoriska fält
   if (!bestallare || !beslut || !startDate || !endDate || !executor) {
     return res.status(400).json({ message: 'Alla obligatoriska fält måste vara ifyllda.' });
   }
@@ -52,7 +44,8 @@ const createDecision = async (req, res) => {
       ansvarig: ansvarig || null,
       handledare: handledare || null,
       telefon: telefon || null,
-      kategori: kategori || null, // <- Lägg till kategori här
+      kategori: kategori || null,
+      createdBy: req.user.username // logga vem som skapade beslutet
     });
 
     res.status(201).json({
@@ -65,14 +58,16 @@ const createDecision = async (req, res) => {
   }
 };
 
-
-// Hämta alla beslut för en specifik deltagare och insats
+// 🔒 Hämta alla beslut för en specifik deltagare och insats
 const getDecisionsByParticipantAndInsats = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   const participantId = req.params.participantId;
-  const insatsId = req.params.insatsId;  // Ta emot insatsId från parametern
+  const insatsId = req.params.insatsId;
 
   try {
-    // Hämta beslut för specifik deltagare och insats
     const decisions = await decisionsModel.getDecisionsByParticipantAndInsats(participantId, insatsId);
     res.status(200).json(decisions);
   } catch (error) {
@@ -81,8 +76,12 @@ const getDecisionsByParticipantAndInsats = async (req, res) => {
   }
 };
 
-// Hämta alla beslut
+// 🔒 Hämta alla beslut
 const getAllDecisions = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   try {
     const decisions = await decisionsModel.getAllDecisions();
     res.status(200).json(decisions);
@@ -92,26 +91,21 @@ const getAllDecisions = async (req, res) => {
   }
 };
 
+// 🔒 Avsluta en insats
 const endInsats = async (req, res) => {
-  // Logga inkommande data för att säkerställa att den skickas korrekt
-  console.log('Received data in req.body:', req.body);  // Lägg till mer loggning för att visa hela body
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
 
   const { participantId, endingStatus } = req.body;
   const { insatsId } = req.params;
 
-  // Validering av inkommande data
   if (!endingStatus || !participantId) {
-    console.log('Fel: Både deltagar-ID och avslutningsstatus måste anges.');
     return res.status(400).json({ message: 'Både deltagar-ID och avslutningsstatus måste anges.' });
   }
 
   try {
-    // Anropa modellen för att avsluta insatsen
-    console.log('Försöker uppdatera insatsen i modellen...');
-    const updatedInsats = await decisionsModel.endInsats(insatsId, participantId, endingStatus);
-
-    // Skicka tillbaka det uppdaterade resultatet som svar
-    console.log('Insatsen avslutad:', updatedInsats);
+    const updatedInsats = await decisionsModel.endInsats(insatsId, participantId, endingStatus, req.user.username);
     res.status(200).json({
       message: 'Insatsen har avslutats!',
       data: updatedInsats,
@@ -122,10 +116,9 @@ const endInsats = async (req, res) => {
   }
 };
 
-
 module.exports = {
   createDecision,
   getDecisionsByParticipantAndInsats,
   getAllDecisions,
-  endInsats,  // Exportera den nya funktionen
+  endInsats,
 };

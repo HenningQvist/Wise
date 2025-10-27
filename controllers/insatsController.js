@@ -4,17 +4,21 @@ const multer = require('multer');
 // Multer-konfiguration för filuppladdning
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');  // Ange mappen där filer ska sparas
+    cb(null, 'uploads/'); // Ange mappen där filer ska sparas
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);  // Ge filen ett unikt namn
+    cb(null, Date.now() + '-' + file.originalname); // Ge filen ett unikt namn
   }
 });
 
 const upload = multer({ storage: storage });
 
-// POST - skapa en ny Insats
+// 🔒 Skapa en ny Insats
 const createInsatsController = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   const {
     name,
     focusType,
@@ -45,7 +49,8 @@ const createInsatsController = async (req, res) => {
       startDate,
       endDate,
       lastDate,
-      responsible
+      responsible,
+      createdBy: req.user.username // ← sparar vem som skapade insatsen
     };
 
     const newInsatsId = await createInsats(insatsData);
@@ -64,11 +69,14 @@ const createInsatsController = async (req, res) => {
   }
 };
 
-// GET - Hämta alla insatser inklusive filer
+// 🔒 Hämta alla insatser inklusive filer
 const getAllInsatserController = async (req, res) => {
-  try {
-    const insatser = await getAllInsatser(); // Nu hämtar denna redan filer via JOIN
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
 
+  try {
+    const insatser = await getAllInsatser(); // Modellen hämtar filer via JOIN
     res.status(200).json({
       message: '✅ Insatser och tillhörande filer hämtades framgångsrikt!',
       insatser: insatser

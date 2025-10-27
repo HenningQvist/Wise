@@ -50,6 +50,7 @@ const loginUser = async (req, res) => {
     await loginAttemptModel.logLoginAttempt(email, true);
 
     const token = createToken(user);
+    console.log(`✅ Användare inloggad: ${user.username}`);
 
     return res.json({
       message: 'Inloggning lyckades!',
@@ -57,7 +58,7 @@ const loginUser = async (req, res) => {
       role: user.role,
       admin: user.admin || false,
       participant_id: user.participant_id || null,
-      token, // ✅ Skickar token till frontend
+      token,
     });
   } catch (err) {
     console.error('❌ Fel vid inloggning:', err);
@@ -83,6 +84,7 @@ const registerUser = async (req, res) => {
     if (!passwordRegex.test(password))
       return res.status(400).json({ error: 'Lösenordet måste innehålla minst 8 tecken, en stor bokstav, en siffra och ett specialtecken' });
 
+    // Kontrollera om användaren redan finns
     const existingUserByUsername = await userModel.getUserByUsername(username);
     const existingUserByEmail = await userModel.getUserByEmail(email);
     if (existingUserByUsername || existingUserByEmail)
@@ -102,13 +104,14 @@ const registerUser = async (req, res) => {
     }
 
     const token = createToken(newUser);
+    console.log(`✅ Ny användare registrerad: ${newUser.username}`);
 
     return res.status(201).json({
       message: 'Registrering lyckades',
       username: newUser.username,
       role: newUser.role,
       participant_id: newUser.participant_id || null,
-      token, // ✅ Skickar token till frontend
+      token,
     });
   } catch (err) {
     console.error('❌ Fel vid registrering:', err);

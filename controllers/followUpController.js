@@ -1,7 +1,11 @@
 const FollowUp = require('../models/followUpModel');
 
-// Skapa en ny uppföljning
+// 🔒 Skapa en ny uppföljning
 const createFollowUp = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   const {
     fromName,
     fromEmail,
@@ -12,8 +16,7 @@ const createFollowUp = async (req, res) => {
     startTime,
     endTime,
     location,
-    created_by,
-    participant_id // ✅ Lägg till här
+    participant_id
   } = req.body;
 
   try {
@@ -27,8 +30,8 @@ const createFollowUp = async (req, res) => {
       startTime,
       endTime,
       location,
-      created_by,
-      participant_id // ✅ Skicka med
+      created_by: req.user.username, // ← Använd JWT
+      participant_id
     });
 
     res.status(201).json({ message: 'Uppföljning skapad', followUp: newFollowUp });
@@ -38,8 +41,12 @@ const createFollowUp = async (req, res) => {
   }
 };
 
-// Hämta alla uppföljningar
+// 🔒 Hämta alla uppföljningar
 const getAllFollowUps = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   try {
     const followUps = await FollowUp.getAllFollowUps();
     res.json(followUps);
@@ -49,8 +56,12 @@ const getAllFollowUps = async (req, res) => {
   }
 };
 
-// Hämta uppföljningar för specifik e-post
+// 🔒 Hämta uppföljningar för specifik e-post
 const getFollowUpsByEmail = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   const { email } = req.params;
   try {
     const followUps = await FollowUp.getFollowUpsByEmail(email);
@@ -61,8 +72,12 @@ const getFollowUpsByEmail = async (req, res) => {
   }
 };
 
-// Hämta uppföljningar för specifik deltagare via participant_id
+// 🔒 Hämta uppföljningar för specifik deltagare via participant_id
 const getFollowUpsByParticipantId = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+  }
+
   const { participantId } = req.params;
   try {
     const followUps = await FollowUp.getFollowUpsByParticipantId(participantId);
@@ -73,7 +88,6 @@ const getFollowUpsByParticipantId = async (req, res) => {
   }
 };
 
-// ✅ Endast en korrekt export
 module.exports = {
   createFollowUp,
   getAllFollowUps,

@@ -1,7 +1,9 @@
 const { saveSelectedInsatser, getSelectedInsatser, getAllSelectedInsatser } = require('../models/selectedInsatserModel');
 
-// POST - Spara valda insatser för en deltagare
+// 🔒 POST - Spara valda insatser för en deltagare
 const createSelectedInsatserController = async (req, res) => {
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+
   const { participantId, step, selectedInsatser } = req.body;
 
   if (!participantId || !Array.isArray(selectedInsatser) || selectedInsatser.length === 0) {
@@ -20,8 +22,10 @@ const createSelectedInsatserController = async (req, res) => {
   }
 };
 
-// GET - Hämta valda insatser för en deltagare
+// 🔒 GET - Hämta valda insatser för en deltagare
 const getSelectedInsatserController = async (req, res) => {
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+
   const participantId = req.params.participantId || req.body.participantId;
 
   if (!participantId) {
@@ -31,7 +35,7 @@ const getSelectedInsatserController = async (req, res) => {
   try {
     const selectedInsatser = await getSelectedInsatser(participantId);
 
-    if (selectedInsatser.length === 0) {
+    if (!selectedInsatser || selectedInsatser.length === 0) {
       return res.status(404).json({ message: 'Inga insatser hittades för denna deltagare.' });
     }
 
@@ -45,12 +49,14 @@ const getSelectedInsatserController = async (req, res) => {
   }
 };
 
-// GET - Hämta alla valda insatser (utan krav på participantId)
+// 🔒 GET - Hämta alla valda insatser (utan krav på participantId)
 const getAllSelectedInsatserController = async (req, res) => {
-  try {
-    const allSelectedInsatser = await getAllSelectedInsatser(); // Anpassa denna funktion i din service/databasmodell
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
 
-    if (allSelectedInsatser.length === 0) {
+  try {
+    const allSelectedInsatser = await getAllSelectedInsatser();
+
+    if (!allSelectedInsatser || allSelectedInsatser.length === 0) {
       return res.status(404).json({ message: 'Inga insatser hittades.' });
     }
 

@@ -5,9 +5,13 @@ const {
   findByParticipantId
 } = require('../models/completedStepModel');
 
-// POST /api/saveSteps/   — befintlig funktion
+// 🔒 POST /api/saveSteps/ — sparar eller uppdaterar steg
 const saveOrUpdateCompletedSteps = async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+    }
+
     console.log('📥 Mottaget req.body:', req.body);
     const { participantId, completedSteps } = req.body;
     const existing = await findByParticipantId(participantId);
@@ -27,15 +31,19 @@ const saveOrUpdateCompletedSteps = async (req, res) => {
   }
 };
 
-// GET /api/steps/:participantId  — ny funktion
+// 🔒 GET /api/steps/:participantId — hämtar steg
 const getCompletedSteps = async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
+    }
+
     const participantId = req.params.participantId;
     console.log('🔍 Hämtar steg för participant:', participantId);
 
     const row = await findByParticipantId(participantId);
     if (!row) {
-      // Om det inte finns någon rad, returnera default-nivåer 0
+      // Om ingen rad finns, returnera default-nivåer 0
       const empty = {
         grundforutsattningar: {
           'Fysisk hälsa': 0,
@@ -48,7 +56,7 @@ const getCompletedSteps = async (req, res) => {
       return res.status(200).json(empty);
     }
 
-    // Mappa kolumnerna tillbaka till dina etiketter
+    // Mappa kolumnerna tillbaka till etiketter
     const mapped = {
       grundforutsattningar: {
         'Fysisk hälsa':        row.fysisk_halsa,
