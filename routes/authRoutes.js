@@ -1,33 +1,26 @@
-// routes/authRoutes.js
+// In authRoutes.js
 const express = require('express');
 const passport = require('passport');
-const { loginUser, registerUser, loginRateLimiter } = require('../controllers/userController');
+const { loginUser, registerUser, loginRateLimiter } = require('../controllers/userController'); // Importera controller-funktioner
 
 const router = express.Router();
 
-// 🔹 POST /login med rate limiter
-router.post('/login', loginRateLimiter, loginUser);
+// Rate limiter för login
+router.post('/login', loginRateLimiter, loginUser); // POST-rutt för login
 
-// 🔹 POST /register
-router.post('/register', registerUser);
+// Registrering
+router.post('/register', registerUser); // POST-rutt för registrering
 
-// 🔹 GET /userinfo - skyddad route
-router.get(
-  '/userinfo',
-  passport.authenticate('jwt', { session: false }),
-  (req, res) => {
-    // Debug: logga cookies och header
-    console.log('🍪 Cookies:', req.cookies);
-    console.log('🔑 Authorization-header:', req.headers.authorization);
 
-    if (!req.user) {
-      console.warn('🚫 Ej autentiserad användare försökte nå /userinfo');
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
-
-    const { id, username, email, role, participant_id } = req.user;
-    res.json({ id, username, email, role, participant_id });
+router.get('/userinfo', passport.authenticate('jwt', { session: false }), (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Not authenticated' });
   }
-);
+
+  const { id, username, role, participant_id } = req.user;
+  res.json({ id, username, role, participant_id }); 
+});
+
+
 
 module.exports = router;
