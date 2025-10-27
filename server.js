@@ -7,12 +7,13 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
+const passport = require('./config/passport'); // <-- Passport JWT
 
 const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-// 🔹 Ladda .env
+// 🔹 Ladda .env i utveckling
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
   console.log('🌱 Miljövariabler laddade från .env');
@@ -28,29 +29,37 @@ if (process.env.NODE_ENV !== 'production') {
 
 const app = express();
 
-// ✅ Trust proxy i produktion
+// ✅ Trust proxy i produktion (om du kör bakom Railway reverse proxy)
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 
 // ✅ Säkerhet & logg
 app.use(helmet());
 app.use(process.env.NODE_ENV !== 'production' ? morgan('dev') : morgan('combined'));
 
-// ✅ CORS
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
-app.use(cors({
+// ✅ Dynamisk CORS-konfiguration
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error('CORS-förfrågan blockerad av servern.'));
   },
   credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization']
-}));
-app.options('*', cors()); // preflight
+  allowedHeaders: ['Origin','X-Requested-With','Content-Type','Accept','Authorization'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS']
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Preflight
 
 // ✅ JSON & cookies
 app.use(express.json());
 app.use(cookieParser());
+
+// ✅ Passport JWT
+app.use(passport.initialize());
 
 // ✅ Anpassad middleware
 applyMiddleware(app);
@@ -63,12 +72,12 @@ app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.i
 app.use('/api/auth', authRoutes);
 app.use('/api', protectedRoutes);
 
-// ✅ Hantera 404 på alla övriga rutter
+// ✅ Hantera 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// ✅ Global felhantering med JSON-svar
+// ✅ Global felhantering med JSON
 app.use((err, req, res, next) => {
   console.error('💥 Server error:', err);
   res.status(err.status || 500).json({
@@ -90,7 +99,7 @@ if (process.env.NODE_ENV !== 'production') {
       console.log(`🚀 HTTPS-server lokalt på https://localhost:${PORT}`);
     });
   } else {
-    console.warn('⚠️ SSL-filer saknas, startar HTTP istället');
+    console.warn('⚠️ Lokala SSL-filer saknas, startar HTTP istället');
     app.listen(PORT, () => console.log(`🚀 HTTP-server lokalt på http://localhost:${PORT}`));
   }
 } else {
