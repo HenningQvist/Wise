@@ -1,6 +1,5 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const passport = require('passport');
 const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -13,13 +12,13 @@ const authRoutes = require('./routes/authRoutes');
 const protectedRoutes = require('./routes/protectedRoutes');
 const applyMiddleware = require('./middlewares/middleware');
 
-// Ladda .env i utveckling
+// 🔹 Ladda .env i utveckling
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
   console.log('🌱 Miljövariabler laddade från .env');
 }
 
-// Kontrollera obligatoriska miljövariabler
+// 🔹 Kontrollera obligatoriska miljövariabler
 const requiredVars = ['DB_USER', 'DB_PASS', 'DB_HOST', 'DB_NAME', 'JWT_SECRET'];
 requiredVars.forEach((v) => {
   if (!process.env[v]) {
@@ -30,7 +29,7 @@ requiredVars.forEach((v) => {
 
 const app = express();
 
-// ✅ Trust proxy i produktion
+// ✅ Trust proxy i produktion (om du kör bakom Railway reverse proxy)
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
@@ -40,9 +39,12 @@ app.use(helmet());
 app.use(process.env.NODE_ENV !== 'production' ? morgan('dev') : morgan('combined'));
 
 // ✅ Dynamisk CORS-konfiguration
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
@@ -51,22 +53,14 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-}));
+};
 
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-}));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Preflight
 
-// ✅ JSON, cookies
+// ✅ JSON & cookies
 app.use(express.json());
 app.use(cookieParser());
-
-// ✅ Passport init
-require('./config/passport')(passport);
-app.use(passport.initialize());
 
 // ✅ Anpassad middleware
 applyMiddleware(app);
