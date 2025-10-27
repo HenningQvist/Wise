@@ -1,33 +1,63 @@
-// routes/insatsRoutes.js
+// routes/insatsRouter.js
 
 const express = require('express');
 const router = express.Router();
-const { createInsatsController, getAllInsatserController, upload } = require('../controllers/insatsController');
-const { createSelectedInsatserController, getSelectedInsatserController, getAllSelectedInsatserController } = require('../controllers/selectedInsatserController');
-const { createDecision, getAllDecisions } = require('../controllers/decisionsController');
-const { endInsats } = require('../controllers/decisionsController');
+const passport = require('../config/passport');
 
-// Skapa ny insats
+const { createInsatsController, getAllInsatserController, upload } = require('../controllers/insatsController');
+const { 
+  createSelectedInsatserController, 
+  getSelectedInsatserController, 
+  getAllSelectedInsatserController 
+} = require('../controllers/selectedInsatserController');
+const { createDecision, getAllDecisions, endInsats } = require('../controllers/decisionsController');
+
+// 🔒 Alla rutter här kräver JWT via Passport
+router.use(passport.authenticate('jwt', { session: false }));
+
+// Test-rutt
+router.get('/protected-insats', (req, res) => {
+  res.json({ message: 'Det här är en skyddad insats-resurs', user: req.user });
+});
+
+// ------------------------
+// INSATSER
+// ------------------------
+
+// Skapa ny insats med uppladdning av filer
 router.post('/insatser', upload.array('files'), createInsatsController);
 
 // Hämta alla insatser
 router.get('/insatser', getAllInsatserController);
 
-// POST - spara valda insatser för en deltagare
+// ------------------------
+// VALDA INSATSER
+// ------------------------
+
+// Spara valda insatser för en deltagare
 router.post('/selected-insatser', createSelectedInsatserController);
 
+// Hämta alla valda insatser
 router.get('/selected-insatser', getAllSelectedInsatserController);
 
-// GET - Hämta valda insatser för en specifik deltagare
+// Hämta valda insatser för en specifik deltagare
 router.get('/selected-insatser/:participantId', getSelectedInsatserController);
 
-// POST-rutt för att skapa ett nytt beslut (med både participantId och insatsId)
+// ------------------------
+// BESLUT
+// ------------------------
+
+// Skapa nytt beslut för en deltagare + insats
 router.post('/decisions/:participantId/:insatsId', createDecision);
 
-// GET-rutt för att hämta alla beslut för en viss deltagare och insats
+// Hämta alla beslut för en deltagare + insats
 router.get('/decisions/:participantId/:insatsId', getAllDecisions);
 
-// Route för att avsluta en insats
-router.post('/end-insats/:insatsId', endInsats);  // Använd post för att avsluta en insats
+// ------------------------
+// AVSLUTA INSATS
+// ------------------------
+
+// Avsluta en insats
+router.post('/end-insats/:insatsId', endInsats);
 
 module.exports = router;
