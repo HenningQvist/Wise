@@ -2,9 +2,7 @@ const Rating = require('../models/ratings.model'); // Importera Rating-modellen
 
 // 🔒 Spara eller uppdatera ratings för en deltagare
 const saveRatings = async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
-  }
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
 
   try {
     const { participantId } = req.params;
@@ -27,47 +25,47 @@ const saveRatings = async (req, res) => {
     ];
 
     for (let field of requiredFields) {
-      if (ratings[field] === undefined) {
+      if (!ratings[field]) {
         return res.status(400).json({ message: `Fältet ${field} saknas i request body` });
       }
     }
 
-    // Använd req.user.username som skapare/uppdaterare om du vill logga det
+    // Spara rating i databasen
     const savedRating = await Rating.save(participantId, ratings);
 
-    res.status(201).json({ message: 'Skattningar sparade!', data: savedRating });
+    return res.status(201).json({
+      message: 'Skattningar sparade!',
+      data: savedRating,
+    });
   } catch (error) {
     console.error('❌ Fel vid sparande av ratings:', error);
-    res.status(500).json({ message: 'Det gick inte att spara skattningar', error: error.message });
+    return res.status(500).json({
+      message: 'Det gick inte att spara skattningar',
+      error: error.message,
+    });
   }
 };
 
 // 🔒 Hämta den senaste rating för en deltagare
 const getLatestRating = async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
-  }
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
 
   try {
     const { participantId } = req.params;
     const rating = await Rating.getByUserId(participantId);
 
-    if (!rating) {
-      return res.status(404).json({ message: 'Ingen rating hittades för deltagaren.' });
-    }
+    if (!rating) return res.status(404).json({ message: 'Ingen rating hittades för deltagaren.' });
 
-    res.json(rating);
+    return res.json(rating);
   } catch (error) {
     console.error('❌ Fel vid hämtning av senaste rating:', error);
-    res.status(500).json({ message: 'Serverfel vid hämtning av rating' });
+    return res.status(500).json({ message: 'Serverfel vid hämtning av rating' });
   }
 };
 
-// 🔒 Hämta första och senaste rating för en deltagare
+// 🔒 Hämta första och senaste rating
 const getFirstAndLatestRating = async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
-  }
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
 
   try {
     const { participantId } = req.params;
@@ -78,18 +76,16 @@ const getFirstAndLatestRating = async (req, res) => {
       return res.status(404).json({ message: 'Kunde inte hitta både första och senaste ratingen.' });
     }
 
-    res.json({ firstRating, latestRating });
+    return res.json({ firstRating, latestRating });
   } catch (error) {
     console.error('❌ Fel vid hämtning av första och senaste rating:', error);
-    res.status(500).json({ message: 'Serverfel vid hämtning av rating' });
+    return res.status(500).json({ message: 'Serverfel vid hämtning av rating' });
   }
 };
 
 // 🔒 Hämta alla ratings för en deltagare
 const getAllRatings = async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
-  }
+  if (!req.user) return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
 
   try {
     const { participantId } = req.params;
@@ -99,10 +95,10 @@ const getAllRatings = async (req, res) => {
       return res.status(404).json({ message: 'Kunde inte hitta några ratingar.' });
     }
 
-    res.json({ allRatings });
+    return res.json({ allRatings });
   } catch (error) {
     console.error('❌ Fel vid hämtning av alla ratingar:', error);
-    res.status(500).json({ message: 'Serverfel vid hämtning av ratingar' });
+    return res.status(500).json({ message: 'Serverfel vid hämtning av ratingar' });
   }
 };
 

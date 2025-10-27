@@ -25,7 +25,6 @@ const createDecision = async (req, res) => {
 
   console.log('Received decision data:', req.body);
 
-  // Validering av obligatoriska fält
   if (!bestallare || !beslut || !startDate || !endDate || !executor) {
     return res.status(400).json({ message: 'Alla obligatoriska fält måste vara ifyllda.' });
   }
@@ -45,7 +44,7 @@ const createDecision = async (req, res) => {
       handledare: handledare || null,
       telefon: telefon || null,
       kategori: kategori || null,
-      createdBy: req.user.username // logga vem som skapade beslutet
+      createdBy: req.user.username // <- loggar vem som skapade beslutet
     });
 
     res.status(201).json({
@@ -58,7 +57,7 @@ const createDecision = async (req, res) => {
   }
 };
 
-// 🔒 Hämta alla beslut för en specifik deltagare och insats
+// 🔒 Hämta beslut för specifik deltagare och insats
 const getDecisionsByParticipantAndInsats = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
@@ -91,7 +90,7 @@ const getAllDecisions = async (req, res) => {
   }
 };
 
-// 🔒 Avsluta en insats
+// 🔒 Avsluta insats
 const endInsats = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Ingen åtkomst: användaren ej autentiserad' });
@@ -105,7 +104,7 @@ const endInsats = async (req, res) => {
   }
 
   try {
-    const updatedInsats = await decisionsModel.endInsats(insatsId, participantId, endingStatus, req.user.username);
+    const updatedInsats = await decisionsModel.endInsats(insatsId, participantId, endingStatus);
     res.status(200).json({
       message: 'Insatsen har avslutats!',
       data: updatedInsats,

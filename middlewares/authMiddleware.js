@@ -1,22 +1,20 @@
+// middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 
-// 🔒 Middleware för att skydda routes med JWT i Authorization-header
 const authenticateUser = (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  const token = req.cookies.token;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!token) {
     return res.status(401).json({ error: 'Ingen token, åtkomst nekad' });
   }
 
-  const token = authHeader.split(' ')[1]; // Bearer <token>
-
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Här ligger id, username, role, admin, participant_id
+    req.user = decoded; // 💥 Här ligger participantId, username, osv.
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Ogiltig eller utgången token' });
+    return res.status(401).json({ error: 'Ogiltig token' });
   }
 };
 
-module.exports = { authenticateUser };
+module.exports = authenticateUser;
