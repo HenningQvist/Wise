@@ -29,7 +29,7 @@ const saveSensitiveData = async (participantId, data) => {
   try {
     const result = await pool.query(
       `INSERT INTO sensitive_data 
-        (participant_id, grundlaggande_uppgifter, hantering_av_vardagen, halsa, koncentrationsformaga, tro_pa_att_fa_jobb, stod_fran_natverk, samarbetsformaga, jobbsökningsbeteende, kunskap_om_arbetsmarknaden, malmedvetenhet) 
+        (participant_id, grundlaggande_uppgifter, hantering_av_vardagen, halsa, koncentrationsformaga, tro_pa_att_fa_jobb, stod_fran_natverk, samarbetsformaga, jobbsokningsbeteende, kunskap_om_arbetsmarknaden, malmedvetenhet) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
         RETURNING *`,
       [
@@ -41,7 +41,7 @@ const saveSensitiveData = async (participantId, data) => {
         data.tro_pa_att_fa_jobb,
         data.stod_fran_natverk,
         data.samarbetsformaga,
-        data.jobbsökningsbeteende,
+        data.jobbsokningsbeteende,
         data.kunskap_om_arbetsmarknaden,
         data.malmedvetenhet,
       ]
