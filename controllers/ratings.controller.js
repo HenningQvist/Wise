@@ -12,7 +12,8 @@ const saveRatings = async (req, res) => {
       return res.status(400).json({ message: 'Rating data saknas i request body' });
     }
 
-    const requiredFields = [
+    // Tillåt att vissa fält saknas
+    const allowedFields = [
       'hantering_av_vardagen',
       'hälsa',
       'koncentrationsförmåga',
@@ -24,14 +25,19 @@ const saveRatings = async (req, res) => {
       'målmedvetenhet',
     ];
 
-    for (let field of requiredFields) {
-      if (!ratings[field]) {
-        return res.status(400).json({ message: `Fältet ${field} saknas i request body` });
+    const filteredRatings = {};
+    for (let field of allowedFields) {
+      if (ratings[field] !== undefined) {
+        filteredRatings[field] = ratings[field];
       }
     }
 
+    if (Object.keys(filteredRatings).length === 0) {
+      return res.status(400).json({ message: 'Inga giltiga fält att spara' });
+    }
+
     // Spara rating i databasen
-    const savedRating = await Rating.save(participantId, ratings);
+    const savedRating = await Rating.save(participantId, filteredRatings);
 
     return res.status(201).json({
       message: 'Skattningar sparade!',
@@ -54,9 +60,19 @@ const getLatestRating = async (req, res) => {
     const { participantId } = req.params;
     const rating = await Rating.getByUserId(participantId);
 
-    if (!rating) return res.status(404).json({ message: 'Ingen rating hittades för deltagaren.' });
+    // Returnera alltid ett objekt, även om ingen rating finns
+    if (!rating) {
+      return res.json({
+        exists: false,
+        message: 'Ingen rating hittades ännu för deltagaren.',
+        data: {}
+      });
+    }
 
-    return res.json(rating);
+    return res.json({
+      exists: true,
+      data: rating
+    });
   } catch (error) {
     console.error('❌ Fel vid hämtning av senaste rating:', error);
     return res.status(500).json({ message: 'Serverfel vid hämtning av rating' });
@@ -72,11 +88,12 @@ const getFirstAndLatestRating = async (req, res) => {
     const firstRating = await Rating.getFirstByUserId(participantId);
     const latestRating = await Rating.getByUserId(participantId);
 
-    if (!firstRating || !latestRating) {
-      return res.status(404).json({ message: 'Kunde inte hitta både första och senaste ratingen.' });
-    }
-
-    return res.json({ firstRating, latestRating });
+    return res.json({
+      firstRating: firstRating || null,
+      latestRating: latestRating || null,
+      existsFirst: !!firstRating,
+      existsLatest: !!latestRating
+    });
   } catch (error) {
     console.error('❌ Fel vid hämtning av första och senaste rating:', error);
     return res.status(500).json({ message: 'Serverfel vid hämtning av rating' });
@@ -91,11 +108,11 @@ const getAllRatings = async (req, res) => {
     const { participantId } = req.params;
     const allRatings = await Rating.getAllByUserId(participantId);
 
-    if (!allRatings || allRatings.length === 0) {
-      return res.status(404).json({ message: 'Kunde inte hitta några ratingar.' });
-    }
-
-    return res.json({ allRatings });
+    return res.json({
+      exists: allRatings && allRatings.length > 0,
+      count: allRatings ? allRatings.length : 0,
+      data: allRatings || []
+    });
   } catch (error) {
     console.error('❌ Fel vid hämtning av alla ratingar:', error);
     return res.status(500).json({ message: 'Serverfel vid hämtning av ratingar' });
