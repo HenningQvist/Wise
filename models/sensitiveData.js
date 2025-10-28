@@ -29,29 +29,30 @@ const saveSensitiveData = async (participantId, data) => {
   try {
     const result = await pool.query(
       `INSERT INTO sensitive_data 
-        (participant_id, grundläggande_uppgifter, hantering_av_vardagen, hälsa, koncentrationsförmåga, tro_på_att_få_jobb, stöd_från_nätverk, samarbetsförmåga, jobbsökningsbeteende, kunskap_om_arbetsmarknaden, målmedvetenhet) 
+        (participant_id, grundlaggande_uppgifter, hantering_av_vardagen, halsa, koncentrationsformaga, tro_pa_att_fa_jobb, stod_fran_natverk, samarbetsformaga, jobbsökningsbeteende, kunskap_om_arbetsmarknaden, malmedvetenhet) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
         RETURNING *`,
       [
         participantId,
-        data.grundläggande_uppgifter,
+        data.grundlaggande_uppgifter,
         data.hantering_av_vardagen,
-        data.hälsa,
-        data.koncentrationsförmåga,
-        data.tro_på_att_få_jobb,
-        data.stöd_från_nätverk,
-        data.samarbetsförmåga,
+        data.halsa,
+        data.koncentrationsformaga,
+        data.tro_pa_att_fa_jobb,
+        data.stod_fran_natverk,
+        data.samarbetsformaga,
         data.jobbsökningsbeteende,
         data.kunskap_om_arbetsmarknaden,
-        data.målmedvetenhet,
+        data.malmedvetenhet,
       ]
     );
-    return result.rows[0]; // Returnera den nyss skapade kartläggningen
+    return result.rows[0];
   } catch (error) {
     console.error('Error saving sensitive data:', error);
     throw new Error('Error saving sensitive data');
   }
 };
+
 
 // Funktion för att hämta den senaste kartläggningen för en deltagare
 const getLatestSensitiveData = async (participantId) => {
