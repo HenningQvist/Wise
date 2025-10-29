@@ -13,23 +13,23 @@ class Rating {
   constructor(userId, ratings) {
     this.userId = userId;
     this.hantering_av_vardagen = ratings.hantering_av_vardagen || null;
-    this.hälsa = ratings.hälsa || null;
-    this.koncentrationsförmåga = ratings.koncentrationsförmåga || null;
-    this.tro_på_att_få_jobb = ratings.tro_på_att_få_jobb || null;
-    this.stöd_från_nätverk = ratings.stöd_från_nätverk || null;
-    this.samarbetsförmåga = ratings.samarbetsförmåga || null;
-    this.jobbsökningsbeteende = ratings.jobbsökningsbeteende || null;
+    this.halsa = ratings.halsa || null;
+    this.koncentrationsformaga = ratings.koncentrationsformaga || null;
+    this.tro_pa_att_fa_jobb = ratings.tro_pa_att_fa_jobb || null;
+    this.stod_fran_natverk = ratings.stod_fran_natverk || null;
+    this.samarbetsformaga = ratings.samarbetsformaga || null;
+    this.jobbsokningsbeteende = ratings.jobbsokningsbeteende || null;
     this.kunskap_om_arbetsmarknaden = ratings.kunskap_om_arbetsmarknaden || null;
-    this.målmedvetenhet = ratings.målmedvetenhet || null;
+    this.malmedvetenhet = ratings.malmedvetenhet || null;
   }
 
-  // Spara rating
+  // 🟢 Spara rating
   static async save(userId, ratings) {
     const query = `
       INSERT INTO ratings (
-        user_id, hantering_av_vardagen, hälsa, koncentrationsförmåga,
-        tro_på_att_få_jobb, stöd_från_nätverk, samarbetsförmåga,
-        jobbsökningsbeteende, kunskap_om_arbetsmarknaden, målmedvetenhet, created_at
+        user_id, hantering_av_vardagen, halsa, koncentrationsformaga,
+        tro_pa_att_fa_jobb, stod_fran_natverk, samarbetsformaga,
+        jobbsokningsbeteende, kunskap_om_arbetsmarknaden, malmedvetenhet, created_at
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
       RETURNING *;
@@ -37,14 +37,14 @@ class Rating {
     const values = [
       userId,
       ratings.hantering_av_vardagen || null,
-      ratings.hälsa || null,
-      ratings.koncentrationsförmåga || null,
-      ratings.tro_på_att_få_jobb || null,
-      ratings.stöd_från_nätverk || null,
-      ratings.samarbetsförmåga || null,
-      ratings.jobbsökningsbeteende || null,
+      ratings.halsa || null,
+      ratings.koncentrationsformaga || null,
+      ratings.tro_pa_att_fa_jobb || null,
+      ratings.stod_fran_natverk || null,
+      ratings.samarbetsformaga || null,
+      ratings.jobbsokningsbeteende || null,
       ratings.kunskap_om_arbetsmarknaden || null,
-      ratings.målmedvetenhet || null,
+      ratings.malmedvetenhet || null,
     ];
 
     try {
@@ -56,7 +56,7 @@ class Rating {
     }
   }
 
-  // Hämta senaste rating
+  // 🟢 Hämta senaste rating
   static async getByUserId(userId) {
     const query = `
       SELECT * FROM ratings
@@ -73,7 +73,7 @@ class Rating {
     }
   }
 
-  // Hämta första rating
+  // 🟢 Hämta första rating
   static async getFirstByUserId(userId) {
     const query = `
       SELECT * FROM ratings
@@ -90,7 +90,7 @@ class Rating {
     }
   }
 
-  // Hämta alla ratings
+  // 🟢 Hämta alla ratings för användare
   static async getAllByUserId(userId) {
     const query = `
       SELECT * FROM ratings
