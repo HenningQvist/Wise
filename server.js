@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const morgan = require('morgan');
@@ -27,10 +28,16 @@ app.use(require('cors')({
   methods: ['GET','POST','PUT','DELETE','OPTIONS']
 }));
 
+// Body parser & cookies
 app.use(express.json());
 app.use(cookieParser());
 app.use(passport.initialize());
 applyMiddleware(app);
+
+// ⚡ Global preflight OPTIONS-hantering
+app.options('*', (req, res) => {
+  res.sendStatus(200);
+});
 
 // Statisk
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -38,7 +45,7 @@ app.use("/favicon.ico", express.static(path.join(__dirname, "public", "favicon.i
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api', protectedRoutes);
+app.use('/api', protectedRoutes); // här ska JWT-middleware appliceras på skyddade rutter
 
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
@@ -52,6 +59,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Server
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {
   const keyFile = process.env.SSL_KEY_FILE || 'localhost-key.pem';
