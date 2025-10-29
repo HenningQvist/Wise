@@ -10,8 +10,8 @@ const pool = new Pool({
 });
 
 class Rating {
-  constructor(userId, ratings) {
-    this.userId = userId;
+  constructor(participantId, ratings) {
+    this.participant_id = participantId;
     this.hantering_av_vardagen = ratings.hantering_av_vardagen || null;
     this.halsa = ratings.halsa || null;
     this.koncentrationsformaga = ratings.koncentrationsformaga || null;
@@ -24,18 +24,27 @@ class Rating {
   }
 
   // 🟢 Spara rating
-  static async save(userId, ratings) {
+  static async save(participantId, ratings) {
     const query = `
       INSERT INTO ratings (
-        user_id, hantering_av_vardagen, halsa, koncentrationsformaga,
-        tro_pa_att_fa_jobb, stod_fran_natverk, samarbetsformaga,
-        jobbsokningsbeteende, kunskap_om_arbetsmarknaden, malmedvetenhet, created_at
+        participant_id,
+        hantering_av_vardagen,
+        halsa,
+        koncentrationsformaga,
+        tro_pa_att_fa_jobb,
+        stod_fran_natverk,
+        samarbetsformaga,
+        jobbsokningsbeteende,
+        kunskap_om_arbetsmarknaden,
+        malmedvetenhet,
+        created_at
       )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
       RETURNING *;
     `;
+
     const values = [
-      userId,
+      participantId,
       ratings.hantering_av_vardagen || null,
       ratings.halsa || null,
       ratings.koncentrationsformaga || null,
@@ -57,15 +66,15 @@ class Rating {
   }
 
   // 🟢 Hämta senaste rating
-  static async getByUserId(userId) {
+  static async getByUserId(participantId) {
     const query = `
       SELECT * FROM ratings
-      WHERE user_id = $1
+      WHERE participant_id = $1
       ORDER BY created_at DESC
       LIMIT 1;
     `;
     try {
-      const result = await pool.query(query, [userId]);
+      const result = await pool.query(query, [participantId]);
       return result.rows[0] || null;
     } catch (error) {
       console.error('❌ Fel vid hämtning av senaste rating:', error);
@@ -74,15 +83,15 @@ class Rating {
   }
 
   // 🟢 Hämta första rating
-  static async getFirstByUserId(userId) {
+  static async getFirstByUserId(participantId) {
     const query = `
       SELECT * FROM ratings
-      WHERE user_id = $1
+      WHERE participant_id = $1
       ORDER BY created_at ASC
       LIMIT 1;
     `;
     try {
-      const result = await pool.query(query, [userId]);
+      const result = await pool.query(query, [participantId]);
       return result.rows[0] || null;
     } catch (error) {
       console.error('❌ Fel vid hämtning av första rating:', error);
@@ -90,15 +99,15 @@ class Rating {
     }
   }
 
-  // 🟢 Hämta alla ratings för användare
-  static async getAllByUserId(userId) {
+  // 🟢 Hämta alla ratings
+  static async getAllByUserId(participantId) {
     const query = `
       SELECT * FROM ratings
-      WHERE user_id = $1
+      WHERE participant_id = $1
       ORDER BY created_at ASC;
     `;
     try {
-      const result = await pool.query(query, [userId]);
+      const result = await pool.query(query, [participantId]);
       return result.rows || [];
     } catch (error) {
       console.error('❌ Fel vid hämtning av alla ratings:', error);
