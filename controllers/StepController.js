@@ -4,27 +4,15 @@ const { saveStep, getStep, getAllSteps } = require("../models/stepModel");
 // 🔒 Spara steg för en deltagare
 const saveStepController = async (req, res) => {
   try {
-    // ✅ Läs token från Authorization-header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Ingen eller ogiltig Authorization-header' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
-    console.log('🔹 Token verifierad:', decoded);
-
     const { participantId } = req.params;
-    if (!participantId) {
-      return res.status(400).json({ error: "Deltagar-ID saknas." });
-    }
+    if (!participantId) return res.status(400).json({ error: "Deltagar-ID saknas." });
 
-    const { step, username } = req.body;
+    const { step } = req.body;
     if (typeof step !== "number" || step < 1 || step > 5) {
       return res.status(400).json({ error: "Ogiltigt steg, steget måste vara mellan 1 och 5" });
     }
 
-    const user = decoded.username || username || 'Okänd användare';
+    const user = req.user?.username || 'Okänd användare';
     console.log(`👤 ${user} sparar steg ${step} för deltagare ${participantId}`);
 
     await saveStep(participantId, step, user);
@@ -32,11 +20,6 @@ const saveStepController = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Fel vid sparande av steg:", error);
-
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Ogiltig eller utgången token' });
-    }
-
     res.status(500).json({ error: "Serverfel vid sparande av steg" });
   }
 };
