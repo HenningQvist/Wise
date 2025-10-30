@@ -69,23 +69,21 @@ const getData = async (req, res) => {
       });
     }
 
-   res.status(200).json({
-  message: 'Kartläggning hämtades framgångsrikt!',
-  data: {
-    grundlaggande_uppgifter: data.grundlaggande_uppgifter || '',
-    hantering_av_vardagen: data.hantering_av_vardagen || '',
-    halsa: data.halsa || '',
-    koncentrationsformaga: data.koncentrationsformaga || '',
-    tro_pa_att_fa_jobb: data.tro_pa_att_fa_jobb || '',
-    stod_fran_natverk: data.stod_fran_natverk || '',
-    samarbetsformaga: data.samarbetsformaga || '',
-    jobbsokningsbeteende: data.jobbsokningsbeteende || '',
-    kunskap_om_arbetsmarknaden: data.kunskap_om_arbetsmarknaden || '',
-    malmedvetenhet: data.malmedvetenhet || '',
-  },
-});
-
-    
+    res.status(200).json({
+      message: 'Kartläggning hämtades framgångsrikt!',
+      data: {
+        grundläggande_uppgifter: data.grundläggande_uppgifter,
+        hantering_av_vardagen: data.hantering_av_vardagen,
+        hälsa: data.hälsa,
+        koncentrationsförmåga: data.koncentrationsförmåga,
+        tro_på_att_få_jobb: data.tro_på_att_få_jobb,
+        stöd_från_nätverk: data.stöd_från_nätverk,
+        samarbetsförmåga: data.samarbetsförmåga,
+        jobbsökningsbeteende: data.jobbsökningsbeteende,
+        kunskap_om_arbetsmarknaden: data.kunskap_om_arbetsmarknaden,
+        målmedvetenhet: data.målmedvetenhet,
+      },
+    });
   } catch (error) {
     console.error('❌ Fel vid hämtning av känslig data:', error);
 
