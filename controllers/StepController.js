@@ -4,6 +4,26 @@ const { saveStep, getStep, getAllSteps } = require("../models/stepModel");
 // 🔒 Spara steg för en deltagare
 const saveStepController = async (req, res) => {
   try {
+    console.log("🔹 Headers:", req.headers); // Loggar alla headers
+    console.log("🔹 Body:", req.body);        // Loggar body
+
+    // Om du vill testa token manuellt:
+    const authHeader = req.headers.authorization;
+    console.log("🔹 Authorization-header:", authHeader);
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Ingen token tillhandahållen' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+      console.log('🔹 Token verifierad manuellt:', decoded);
+    } catch (err) {
+      console.error('❌ Token kunde inte verifieras:', err.message);
+      return res.status(401).json({ message: 'Ogiltig token' });
+    }
+
     const { participantId } = req.params;
     if (!participantId) return res.status(400).json({ error: "Deltagar-ID saknas." });
 
@@ -23,6 +43,7 @@ const saveStepController = async (req, res) => {
     res.status(500).json({ error: "Serverfel vid sparande av steg" });
   }
 };
+
 
 // 🔹 Hämta steg för en deltagare
 const getStepController = async (req, res) => {
